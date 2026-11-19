@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1b1630">
+<title>Alvik Remote</title>
+<style>
+  :root {
+    --bg: #1b1630; --panel: #2a2347; --text: #fff; --muted: #b8b0d8;
+    --up: #3fa9f5; --lights: #ffd23f; --turbo: #ff6b35; --disco: #c86bfa; --bumper: #3ddc84;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px; gap: 16px;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+    overflow: hidden;
+  }
+  header { width: 100%; max-width: 900px; display: flex; align-items: center; gap: 12px; }
+  h1 { margin: 0; font-size: 28px; flex: 1; }
+  #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; }
+  #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
+  #connect {
+    font: inherit; font-size: 20px; font-weight: 700; border: 0; border-radius: 14px;
+    padding: 12px 20px; background: var(--up); color: #fff; cursor: pointer;
+  }
+  #connect.connected { background: var(--panel); color: var(--muted); }
+  #msg { max-width: 600px; text-align: center; color: var(--muted); font-size: 18px; line-height: 1.4; }
+  #msg:empty { display: none; }
+  main {
+    flex: 1; width: 100%; max-width: 900px;
+    display: flex; align-items: center; justify-content: space-around; gap: 24px; flex-wrap: wrap;
+  }
+  .pad {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(3, min(26vw, 120px));
+    grid-template-rows: repeat(3, min(26vw, 120px));
+  }
+  button.big.arrow { font-size: min(14vw, 64px); color: #fff; background: var(--up); }
+  .arrow[data-b="5"] { grid-area: 1 / 2; }
+  .arrow[data-b="7"] { grid-area: 2 / 1; }
+  .arrow[data-b="8"] { grid-area: 2 / 3; }
+  .arrow[data-b="6"] { grid-area: 3 / 2; }
+  .actions { display: grid; grid-template-columns: repeat(2, min(40vw, 170px)); gap: 14px; }
+  button.big {
+    font: inherit; color: #1b1630; border: 0; border-radius: 22px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 6px 0 rgba(0,0,0,.35); transition: transform .05s, box-shadow .05s, opacity .2s;
+  }
+  button.big:disabled { opacity: .35; }
+  button.big.down { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.15); }
+  button.big.action { height: min(40vw, 150px); font-size: 22px; font-weight: 800; gap: 4px; }
+  .action .emoji { font-size: min(13vw, 56px); line-height: 1; }
+  .action .state { font-size: 15px; font-weight: 700; opacity: .75; min-height: 1em; }
+  .action[data-b="1"] { background: var(--lights); }
+  .action[data-b="2"] { background: var(--turbo); }
+  .action[data-b="3"] { background: var(--disco); }
+  .action[data-b="4"] { background: var(--bumper); }
+  .action.off { filter: saturate(.25) brightness(.8); }
+  @keyframes disco {
+    0% { background: #ff3b3b } 20% { background: #ffd23f } 40% { background: #3ddc84 }
+    60% { background: #3fa9f5 } 80% { background: #c86bfa } 100% { background: #ff3b3b }
+  }
+  .action.dancing { animation: disco .6s linear infinite; }
+  footer { color: var(--muted); font-size: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Alvik</h1>
+  <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
+  <button id="connect">Connect</button>
+</header>
+
+<div id="msg"></div>
+
+<main>
+  <div class="pad" aria-label="Drive">
+    <button class="big arrow" data-b="5" aria-label="Forward">▲</button>
+    <button class="big arrow" data-b="7" aria-label="Left">◀</button>
+    <button class="big arrow" data-b="8" aria-label="Right">▶</button>
+    <button class="big arrow" data-b="6" aria-label="Back">▼</button>
+  </div>
+
+  <div class="actions">
+    <button class="big action" data-b="1"><span class="emoji">💡</span>Lights<span class="state"></span></button>
+    <button class="big action" data-b="2"><span class="emoji">🚀</span>Turbo<span class="state" id="turboState">off</span></button>
+    <button class="big action" data-b="3"><span class="emoji">🪩</span>Disco!<span class="state"></span></button>
+    <button class="big action" data-b="4"><span class="emoji">🛡️</span>Bumper<span class="state" id="bumperState">on</span></button>
+  </div>
+</main>
+
+<footer>On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</footer>
+
+<script>
+// Talks to remote_control.py on the robot using the same Nordic UART "Control Pad"
+// packets the Bluefruit Connect app sends:  '!' 'B' <button '1'-'8'> <'1' down / '0' up> <checksum>
+// Buttons: 1 lights, 2 turbo, 3 disco, 4 bumper, 5 up, 6 down, 7 left, 8 right.
+const NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const RX  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // robot listens here
+
+const $ = (id) => document.getElementById(id);
+const allButtons = [...document.querySelectorAll("button.big")];
+let device = null, rx = null;
+let queue = Promise.resolve();          // BLE writes must not overlap
+let turbo = false, bumper = true;       // robot starts each session with turbo off, bumper on
+const held = new Map();                 // pointerId / key -> button number
+
+function packet(button, pressed) {
+  const bytes = [0x21, 0x42, 48 + button, pressed ? 0x31 : 0x30];
+  bytes.push(~bytes.reduce((a, b) => a + b, 0) & 0xff);
+  return new Uint8Array(bytes);
+}
+
+function send(button, pressed) {
+  if (!rx) return;
+  const data = packet(button, pressed);
+  queue = queue.then(() =>
+    (rx.writeValueWithoutResponse ? rx.writeValueWithoutResponse(data) : rx.writeValue(data))
+  ).catch((e) => console.warn("write failed", e));
+}
+
+function setConnected(on) {
+  $("dot").classList.toggle("on", on);
+  $("statusText").textContent = on ? "Connected" : "Not connected";
+  $("connect").textContent = on ? "Disconnect" : "Connect";
+  $("connect").classList.toggle("connected", on);
+  allButtons.forEach((b) => (b.disabled = !on));
+  if (on) {
+    turbo = false; bumper = true; showToggles();
+  } else {
+    held.clear();
+    allButtons.forEach((b) => b.classList.remove("down"));
+  }
+}
+
+function showToggles() {
+  $("turboState").textContent = turbo ? "ON" : "off";
+  $("bumperState").textContent = bumper ? "on" : "OFF";
+  document.querySelector('[data-b="2"]').classList.toggle("off", !turbo);
+  document.querySelector('[data-b="4"]').classList.toggle("off", !bumper);
+}
+
+async function connect() {
+  if (device?.gatt?.connected) { device.gatt.disconnect(); return; }
+  try {
+    $("msg").textContent = "";
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [NUS] }, { namePrefix: "Alvik" }],
+      optionalServices: [NUS],
+    });
+    device.addEventListener("gattserverdisconnected", () => { rx = null; setConnected(false); });
+    $("statusText").textContent = "Connecting…";
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(NUS);
+    rx = await service.getCharacteristic(RX);
+    setConnected(true);
+  } catch (e) {
+    if (e.name !== "NotFoundError") {   // NotFoundError = user closed the picker
+      $("msg").textContent = "Couldn't connect: " + e.message +
+        ". Is the robot on purple mode with yellow lights?";
+    }
+    setConnected(false);
+  }
+}
+
+function press(id, el) {
+  const b = Number(el.dataset.b);
+  held.set(id, b);
+  el.classList.add("down");
+  send(b, true);
+  if (b === 2) { turbo = !turbo; showToggles(); }
+  if (b === 4) { bumper = !bumper; showToggles(); }
+  if (b === 3) { el.classList.add("dancing"); setTimeout(() => el.classList.remove("dancing"), 4000); }
+}
+
+function release(id) {
+  const b = held.get(id);
+  if (b === undefined) return;
+  held.delete(id);
+  // only lift the button if no other finger/key is still holding it
+  if (![...held.values()].includes(b)) {
+    document.querySelector(`[data-b="${b}"]`).classList.remove("down");
+    send(b, false);
+  }
+}
+
+function releaseAll() { [...held.keys()].forEach(release); }
+
+// touch / mouse: hold to drive, several fingers at once for curves
+allButtons.forEach((el) => {
+  el.addEventListener("pointerdown", (e) => {
+    if (el.disabled) return;
+    e.preventDefault();
+    el.setPointerCapture?.(e.pointerId);
+    press("p" + e.pointerId, el);
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) =>
+    el.addEventListener(t, (e) => release("p" + e.pointerId)));
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+});
+
+// keyboard on a laptop: arrows drive, 1-4 for the action buttons
+const KEYS = { ArrowUp: 5, ArrowDown: 6, ArrowLeft: 7, ArrowRight: 8, Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 };
+addEventListener("keydown", (e) => {
+  const b = KEYS[e.code];
+  if (!b || e.repeat || !rx) return;
+  e.preventDefault();
+  press("k" + e.code, document.querySelector(`[data-b="${b}"]`));
+});
+addEventListener("keyup", (e) => release("k" + e.code));
+
+// safety: stop driving if the page is hidden or loses focus
+addEventListener("blur", releaseAll);
+document.addEventListener("visibilitychange", () => document.hidden && releaseAll());
+
+$("connect").addEventListener("click", connect);
+setConnected(false);
+
+if (!navigator.bluetooth) {
+  $("connect").disabled = true;
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  $("msg").innerHTML = ios
+    ? "This browser can't talk to Bluetooth robots. On iPad, open this page in the free <b>Bluefy</b> app instead."
+    : "This browser can't talk to Bluetooth robots. Try <b>Chrome</b> or <b>Edge</b>.";
+}
+</script>
+</body>
+</html>

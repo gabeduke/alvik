@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+stock-backup/*
+!stock-backup/.gitkeep
+.DS_Store
