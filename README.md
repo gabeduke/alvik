@@ -36,6 +36,7 @@ If several boards are plugged in: `mpr connect /dev/cu.usbmodemXXXX ...`
 3. Arrows drive · 1 lights · 2 turbo · 3 disco dance · 4 bumper on/off. ✗ on the robot returns to the menu.
 
 ## Web remote (`docs/index.html`)
+**Live: https://gabeduke.github.io/alvik/** (GitHub Pages, redeploys on every push to `main`)
 Big labelled buttons in the browser, same Bluetooth messages as Bluefruit, so nothing changes on the robot.
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
 Laptop keys: arrows drive, 1-4 for the buttons.
