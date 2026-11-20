@@ -11,6 +11,7 @@ printer, change FIT and build again.
 """
 import bpy, bmesh, os, sys
 from math import pi, cos, sin
+from mathutils import Matrix
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "grove")
@@ -25,7 +26,8 @@ SKIRT = 1.5             # wall of the brick underneath; studs press against its 
 SOCKET = 2.0            # how deep the studs go in
 FLOOR = 1.4             # solid layer over the studs = floor of the tray
 TUBE_OUT = 6.3          # tube between four studs
-TUBE_IN = 4.9
+TUBE_IN = 3.9           # leaves a 1.2 wall, three passes of a 0.4 nozzle
+CHAMFER = 0.3           # bottom edges of the sockets lean back: room for a squashed first layer
 
 # ---------- Grove boards, mm ----------
 PCB_T = 1.6
@@ -74,6 +76,33 @@ def cyl(x, y, r, z0, z1, n=48):
         v.co.x += x
         v.co.y += y
         v.co.z += (z0 + z1) / 2
+    return obj_from(bm)
+
+
+def turned(x, y, profile, n=48):
+    """A solid of revolution about the vertical line at (x, y). profile: (radius, z) going up."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x + r * cos(2 * pi * k / n), y + r * sin(2 * pi * k / n), z)) for k in range(n)]
+             for r, z in profile]
+    bm.faces.new(rings[0])
+    bm.faces.new(rings[-1])
+    for lo, hi in zip(rings, rings[1:]):
+        for k in range(n):
+            j = (k + 1) % n
+            bm.faces.new((lo[k], lo[j], hi[j], hi[k]))
+    return obj_from(bm)
+
+
+def flared(hx, hy, z0, z1, grow):
+    """A box, half sizes hx, hy at z1, wider by grow each side at z0 (below)."""
+    bm = bmesh.new()
+    lo = [bm.verts.new((sx * (hx + grow), sy * (hy + grow), z0)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    hi = [bm.verts.new((sx * hx, sy * hy, z1)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    bm.faces.new(lo)
+    bm.faces.new(hi)
+    for k in range(4):
+        j = (k + 1) % 4
+        bm.faces.new((lo[k], lo[j], hi[j], hi[k]))
     return obj_from(bm)
 
 
@@ -126,12 +155,14 @@ def brick_base(nx, ny):
     """Solid slab nx x ny studs, ZF high. Returns (slab, things to cut, things to add after)."""
     hx, hy = nx * P / 2 - GAP, ny * P / 2 - GAP
     sk = SKIRT - FIT
-    cuts = [box(-hx + sk, hx - sk, -hy + sk, hy - sk, -1, SOCKET)]
+    cuts = [box(-hx + sk, hx - sk, -hy + sk, hy - sk, -1, SOCKET),
+            flared(hx - sk, hy - sk, -CHAMFER, CHAMFER, 2 * CHAMFER)]
     adds = []
+    r = TUBE_OUT / 2 - FIT
     for i in range(nx - 1):
         for j in range(ny - 1):
             x, y = (i - (nx - 2) / 2) * P, (j - (ny - 2) / 2) * P
-            t = cyl(x, y, TUBE_OUT / 2 - FIT, 0, SOCKET + 0.2)
+            t = turned(x, y, [(r - CHAMFER, 0), (r, CHAMFER), (r, SOCKET + 0.2)])
             adds.append(cut(t, [cyl(x, y, TUBE_IN / 2, -1, SOCKET + 0.1)]))
     return box(-hx, hx, -hy, hy, 0, ZF), cuts, adds
 
@@ -247,6 +278,9 @@ if __name__ == "__main__" and bpy.app.background:
     os.makedirs(OUT, exist_ok=True)
     made = build_all()
     for i, (name, (ob, vol)) in enumerate(made.items()):
+        if name.startswith("lid_"):         # lids print roof down: turn the file over
+            ob.data.transform(Matrix.Rotation(pi, 4, 'Y'))
+        ob.data.transform(Matrix.Translation((0, 0, -min(v.co.z for v in ob.data.vertices))))
         bpy.ops.object.select_all(action='DESELECT')
         ob.select_set(True)
         bpy.ops.wm.stl_export(filepath=os.path.join(OUT, name + ".stl"), export_selected_objects=True)
@@ -266,8 +300,9 @@ if __name__ == "__main__" and bpy.app.background:
         scene.render.resolution_x, scene.render.resolution_y = 1600, 1000
         for tag, loc, flip in (("top", (34, -72, 66), False), ("under", (34, -72, 66), True)):
             for ob, _ in made.values():
-                ob.rotation_euler.y = pi if flip else 0
-                ob.location.z = 22 if flip else 0
+                turned = flip != ob.name.startswith("lid_")     # lids are stored roof down
+                ob.rotation_euler.y = pi if turned else 0
+                ob.location.z = 22 if turned else 0
             cam.location = loc
             cam.rotation_euler = (0.85, 0, 0)
             cam.data.type, cam.data.ortho_scale = 'ORTHO', 160

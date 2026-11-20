@@ -47,7 +47,10 @@ hold the lid over the board before snapping it on.
 
 ## Printing
 
-- Trays flat side down, as exported. Lids upside down, roof on the bed. No supports. 0.2 mm layers or finer, 3 walls.
+- Print every file the way up it comes: it already lies flat on the bed (the lids roof down). Don't
+  let the slicer turn it (in Bambu Studio, skip "Auto orient"; "Arrange" is fine). No supports. 0.2 mm layers or finer, 3 walls.
+- The hollow underside prints without supports: the gaps the roof has to bridge are about 3 mm. The
+  socket edges lean back 0.3 mm at the bed so a squashed first layer does not pinch the studs.
 - PETG is kinder to the clips than PLA; PLA should do if the board is not taken out often.
 - Print `fit_test_2x2.stl` first and press it onto the plate, and a LEGO brick onto its two studs.
   Too tight or too loose: change `FIT` at the top of the script by 0.05 (+ is looser), build, print again.
