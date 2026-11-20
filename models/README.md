@@ -8,6 +8,7 @@ Source files for the 3D Alvik on the web remote (issue #6). Units in the STL/STE
 | `reference/lego_baseplate_12x12.stl` | The printed LEGO-compatible top baseplate (12 x 12 studs, 96 x 96 x 11.4 mm) plus its two pins, laid out as on the print bed | "Arduino Alvik top baseplate (LEGO/DUPLO versions)" by GiulioT, https://makerworld.com/en/models/1298936 | CC BY-NC-SA. Anything built from it keeps that licence and the credit. |
 | `alvik_reference.blend` | Blender scene with both imported (collection `AlvikReference`, scaled to metres, plate placed on top), for looking at them | this repo | as above |
 | `build_alvik_web.py` | Blender script that builds `docs/models/alvik.glb` from the two STLs | this repo | |
+| `build_grove_holders.py`, `grove/*.stl` | Printable trays that hold Grove boards and press onto the plate's studs. See `grove/README.md` | this repo | MIT |
 | `../docs/models/alvik.glb` | The model the web remote shows. Built, not edited by hand. | `build_alvik_web.py` | CC BY-NC-SA (it contains the baseplate); the credit is in the file's `asset.copyright` and on the page |
 
 ## Building the web model
