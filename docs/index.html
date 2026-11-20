@@ -42,16 +42,27 @@
     flex: 1; width: 100%; max-width: 900px;
     display: flex; align-items: center; justify-content: space-around; gap: 24px; flex-wrap: wrap;
   }
-  .pad {
-    display: grid; gap: 10px;
-    grid-template-columns: repeat(3, min(26vw, 120px));
-    grid-template-rows: repeat(3, min(26vw, 120px));
+  .stick {
+    --size: min(80vw, 56vh, 340px);
+    width: var(--size); height: var(--size); border-radius: 50%; position: relative;
+    background: radial-gradient(circle, #3a3163 0%, var(--panel) 70%);
+    box-shadow: inset 0 0 0 6px rgba(255,255,255,.08), 0 6px 0 rgba(0,0,0,.35);
+    touch-action: none; cursor: grab; transition: opacity .2s;
   }
-  button.big.arrow { font-size: min(14vw, 64px); color: #fff; background: var(--up); }
-  .arrow[data-b="5"] { grid-area: 1 / 2; }
-  .arrow[data-b="7"] { grid-area: 2 / 1; }
-  .arrow[data-b="8"] { grid-area: 2 / 3; }
-  .arrow[data-b="6"] { grid-area: 3 / 2; }
+  .stick.disabled { opacity: .35; cursor: default; }
+  .stick .mark { position: absolute; font-size: calc(var(--size) * .09); color: var(--muted); opacity: .6; pointer-events: none; }
+  .mark.n { top: 4%; left: 50%; transform: translateX(-50%); }
+  .mark.s { bottom: 4%; left: 50%; transform: translateX(-50%); }
+  .mark.w { left: 5%; top: 50%; transform: translateY(-50%); }
+  .mark.e { right: 5%; top: 50%; transform: translateY(-50%); }
+  #knob {
+    position: absolute; left: 30%; top: 30%; width: 40%; height: 40%; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #8fd0ff, var(--up) 60%);
+    box-shadow: 0 8px 0 rgba(0,0,0,.35); pointer-events: none;
+    display: flex; align-items: center; justify-content: center; font-size: calc(var(--size) * .16);
+    transition: transform .12s ease-out;
+  }
+  .stick.active #knob { transition: none; filter: brightness(1.15); }
   .actions { display: grid; grid-template-columns: repeat(2, min(40vw, 170px)); gap: 14px; }
   button.big {
     font: inherit; color: #1b1630; border: 0; border-radius: 22px; cursor: pointer;
@@ -60,7 +71,7 @@
   }
   button.big:disabled { opacity: .35; }
   button.big.down { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.15); }
-  button.big.action { height: min(40vw, 150px); font-size: 22px; font-weight: 800; gap: 4px; }
+  button.big.action { height: min(40vw, 32vh, 150px); font-size: 22px; font-weight: 800; gap: 4px; }
   .action .emoji { font-size: min(13vw, 56px); line-height: 1; }
   .action .state { font-size: 15px; font-weight: 700; opacity: .75; min-height: 1em; }
   .action[data-b="1"] { background: var(--lights); }
@@ -90,11 +101,9 @@
 <div id="msg"></div>
 
 <main>
-  <div class="pad" aria-label="Drive">
-    <button class="big arrow" data-b="5" aria-label="Forward">▲</button>
-    <button class="big arrow" data-b="7" aria-label="Left">◀</button>
-    <button class="big arrow" data-b="8" aria-label="Right">▶</button>
-    <button class="big arrow" data-b="6" aria-label="Back">▼</button>
+  <div class="stick disabled" id="stick" role="application" aria-label="Drive: drag the ball. Push a little to go slow, a lot to go fast.">
+    <span class="mark n">▲</span><span class="mark w">◀</span><span class="mark e">▶</span><span class="mark s">▼</span>
+    <div id="knob">🤖</div>
   </div>
 
   <div class="actions">
@@ -112,9 +121,13 @@
 <script type="module">
 import { initPwa } from "./pwa.js";
 
-// Talks to remote_control.py on the robot using the same Nordic UART "Control Pad"
-// packets the Bluefruit Connect app sends:  '!' 'B' <button '1'-'8'> <'1' down / '0' up> <checksum>
-// Buttons: 1 lights, 2 turbo, 3 disco, 4 bumper, 5 up, 6 down, 7 left, 8 right.
+// Talks to remote_control.py on the robot over the Nordic UART service.
+// Buttons are the "Control Pad" packets the Bluefruit Connect app sends:
+//   '!' 'B' <button '1'-'8'> <'1' down / '0' up> <checksum>     1 lights, 2 turbo, 3 disco, 4 bumper
+// Driving is our own joystick packet (the robot also still takes Bluefruit's arrows, buttons 5-8):
+//   '!' 'J' <x> <y> <checksum>     signed bytes -100..100, x right, y forward
+// Checksum = ~(sum of the first 4 bytes) & 0xff. The robot stops if joystick packets stop coming
+// for 0.6 s, so while the stick is held we repeat it.
 const NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const RX  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // robot listens here
 
@@ -126,19 +139,98 @@ let turbo = false, bumper = true;       // robot starts each session with turbo 
 const held = new Map();                 // pointerId / key -> button number
 let pwa = null;                         // set up at the bottom
 
-function packet(button, pressed) {
-  const bytes = [0x21, 0x42, 48 + button, pressed ? 0x31 : 0x30];
-  bytes.push(~bytes.reduce((a, b) => a + b, 0) & 0xff);
+function packet(kind, a, b) {
+  const bytes = [0x21, kind.charCodeAt(0), a & 0xff, b & 0xff];
+  bytes.push(~bytes.reduce((x, y) => x + y, 0) & 0xff);
   return new Uint8Array(bytes);
 }
 
-function send(button, pressed) {
-  if (!rx) return;
-  const data = packet(button, pressed);
-  queue = queue.then(() =>
-    (rx.writeValueWithoutResponse ? rx.writeValueWithoutResponse(data) : rx.writeValue(data))
-  ).catch((e) => console.warn("write failed", e));
+function write(data) {
+  queue = queue.then(() => {
+    const ch = rx;
+    if (!ch) return;
+    return ch.writeValueWithoutResponse ? ch.writeValueWithoutResponse(data) : ch.writeValue(data);
+  }).catch((e) => console.warn("write failed", e));
+  return queue;
 }
+
+function send(button, pressed) {
+  if (rx) write(packet("B", 48 + button, pressed ? 0x31 : 0x30));
+}
+
+// ---------- joystick ----------
+const stickEl = $("stick"), knob = $("knob");
+const DEAD = 0.18;                      // middle of the stick does nothing (per axis: easy to go straight)
+const ARROWS = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+let stickPointer = null, pointerVec = [0, 0];
+const arrowsDown = new Set();
+let want = [0, 0], sent = [0, 0], sentAt = 0, stickBusy = false;
+
+const shape = (v) => Math.abs(v) < DEAD ? 0 : Math.sign(v) * (Math.abs(v) - DEAD) / (1 - DEAD);
+
+function updateStick() {
+  let x = 0, y = 0;
+  if (stickPointer !== null) [x, y] = pointerVec;
+  else for (const k of arrowsDown) { x += ARROWS[k][0]; y += ARROWS[k][1]; }
+  knob.style.transform = `translate(${x * 75}%, ${-y * 75}%)`;
+  want = [Math.round(shape(x) * 100), Math.round(shape(y) * 100)];
+  pumpStick();
+}
+
+function pumpStick() {
+  if (!rx || stickBusy) return;
+  const now = performance.now();
+  const changed = want[0] !== sent[0] || want[1] !== sent[1];
+  const moving = sent[0] || sent[1];
+  if (!changed && !(moving && now - sentAt > 150)) return;       // nothing new, no repeat due
+  if (changed && (want[0] || want[1]) && now - sentAt < 40) return;   // not too chatty (a stop goes at once)
+  const v = [...want];
+  stickBusy = true;
+  write(packet("J", v[0], v[1])).then(() => { sent = v; sentAt = performance.now(); stickBusy = false; });
+}
+setInterval(pumpStick, 50);
+
+function pointerToVec(e) {
+  const r = stickEl.getBoundingClientRect();
+  const reach = r.width * 0.3;
+  let x = (e.clientX - (r.left + r.width / 2)) / reach;
+  let y = -(e.clientY - (r.top + r.height / 2)) / reach;
+  const len = Math.hypot(x, y);
+  if (len > 1) { x /= len; y /= len; }
+  return [x, y];
+}
+
+function centreStick() {
+  stickPointer = null;
+  pointerVec = [0, 0];
+  arrowsDown.clear();
+  stickEl.classList.remove("active");
+  updateStick();
+}
+
+stickEl.addEventListener("pointerdown", (e) => {
+  if (!rx || stickPointer !== null) return;
+  e.preventDefault();
+  stickEl.setPointerCapture?.(e.pointerId);
+  stickPointer = e.pointerId;
+  stickEl.classList.add("active");
+  pointerVec = pointerToVec(e);
+  updateStick();
+});
+stickEl.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== stickPointer) return;
+  pointerVec = pointerToVec(e);
+  updateStick();
+});
+["pointerup", "pointercancel", "lostpointercapture"].forEach((t) =>
+  stickEl.addEventListener(t, (e) => {
+    if (e.pointerId !== stickPointer) return;
+    stickPointer = null;
+    pointerVec = [0, 0];
+    stickEl.classList.remove("active");
+    updateStick();
+  }));
+stickEl.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function setConnected(on) {
   if (!on) pwa?.idle();
@@ -147,11 +239,14 @@ function setConnected(on) {
   $("connect").textContent = on ? "Disconnect" : "Connect";
   $("connect").classList.toggle("connected", on);
   allButtons.forEach((b) => (b.disabled = !on));
+  stickEl.classList.toggle("disabled", !on);
+  sent = [0, 0]; stickBusy = false;      // a robot we just met is standing still
   if (on) {
     turbo = false; bumper = true; showToggles();
   } else {
     held.clear();
     allButtons.forEach((b) => b.classList.remove("down"));
+    centreStick();
   }
 }
 
@@ -206,9 +301,9 @@ function release(id) {
   }
 }
 
-function releaseAll() { [...held.keys()].forEach(release); }
+function releaseAll() { [...held.keys()].forEach(release); centreStick(); }
 
-// touch / mouse: hold to drive, several fingers at once for curves
+// touch / mouse on the action buttons
 allButtons.forEach((el) => {
   el.addEventListener("pointerdown", (e) => {
     if (el.disabled) return;
@@ -221,15 +316,23 @@ allButtons.forEach((el) => {
   el.addEventListener("contextmenu", (e) => e.preventDefault());
 });
 
-// keyboard on a laptop: arrows drive, 1-4 for the action buttons
-const KEYS = { ArrowUp: 5, ArrowDown: 6, ArrowLeft: 7, ArrowRight: 8, Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 };
+// keyboard on a laptop: arrows push the joystick all the way, 1-4 for the action buttons
+const KEYS = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 };
 addEventListener("keydown", (e) => {
+  if (ARROWS[e.code] && rx) {
+    e.preventDefault();
+    if (!e.repeat) { arrowsDown.add(e.code); updateStick(); }
+    return;
+  }
   const b = KEYS[e.code];
   if (!b || e.repeat || !rx) return;
   e.preventDefault();
   press("k" + e.code, document.querySelector(`[data-b="${b}"]`));
 });
-addEventListener("keyup", (e) => release("k" + e.code));
+addEventListener("keyup", (e) => {
+  if (arrowsDown.delete(e.code)) updateStick();
+  release("k" + e.code);
+});
 
 // safety: stop driving if the page is hidden or loses focus
 addEventListener("blur", releaseAll);

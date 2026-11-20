@@ -51,12 +51,14 @@ If several boards are plugged in: `mpr connect /dev/cu.usbmodemXXXX ...`
 2. Phone/tablet: **Bluefruit Connect** → connect to **Alvik** → Controller → Control Pad.
 3. Arrows drive · 1 lights · 2 turbo · 3 disco dance · 4 bumper on/off. ✗ on the robot returns to the menu.
 
+The robot speeds up gently and slows down as it gets close to things (bumper on), then stops 12 cm away with red lights. Tune it at the top of `src/remote_control.py` (`ACCEL`, `DECEL`, `SLOW_CM`, `BUMPER_CM`).
+
 ## Web remote (`docs/index.html`)
 **Live: https://gabeduke.github.io/alvik/** (GitHub Pages via `.github/workflows/pages.yml`, redeploys on every push to `main`)
 Installable app: Chrome → Install (or Android "Add to Home screen"). It works offline. Installed copies update themselves: the build stamps the commit into `sw.js`, and the page reloads on its own (`docs/pwa.js`), but never while the robot is connected or a flash is running.
-Big labelled buttons in the browser, same Bluetooth messages as Bluefruit, so nothing changes on the robot.
+A joystick (push a little = slow, push a lot = fast) and big labelled buttons. The buttons are the same Bluetooth messages as Bluefruit; the joystick is its own message, so the robot needs the current `remote_control.py` (flash it with 🔧).
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
-Laptop keys: arrows drive, 1-4 for the buttons.
+Laptop keys: arrows push the joystick, 1-4 for the buttons.
 ```sh
 scripts/build_site.sh && python3 -m http.server -d _site 8000   # then open http://localhost:8000
 node --test tests/*.test.mjs                                     # flasher + sketch build tests (Node 20+, no installs)

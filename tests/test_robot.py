@@ -390,6 +390,103 @@ class Remote(RobotTest):
         self.assertEqual(robot.drives[-1][1:], (0, 0))
         self.assertEqual(robot.colour_at(5000)[0], WHITE, "headlights back after the dance")
 
+class TimedLink:
+    """A pretend phone: timeline = [(ms, event)], handed to the robot when the clock gets there."""
+    conn = 1
+    lost = False
+
+    def __init__(self, timeline):
+        self.timeline = sorted(timeline, key=lambda e: e[0])
+        self._events = []
+
+    @property
+    def events(self):
+        while self.timeline and self.timeline[0][0] <= CLOCK.now:
+            self._events.append(self.timeline.pop(0)[1])
+        return self._events
+
+    def start(self): pass
+    def stop(self): pass
+
+
+class RemoteDriving(RobotTest):
+    def drive(self, timeline, until=4000, distance=None):
+        import remote_control
+        remote_control._link = TimedLink(timeline)
+        robot = FakeAlvik()
+        if distance:
+            robot.distance = distance
+        robot.presses = [(until, 10 ** 9, "cancel")]
+        self.assertEqual(remote_control.run_remote(robot), -1)
+        return robot, remote_control
+
+    def at(self, robot, t):
+        return [d for d in robot.drives if d[0] <= t][-1][1:]
+
+    def test_parser_buttons_joystick_and_junk(self):
+        import remote_control as rc
+
+        def pkt(a, b, c):
+            body = bytes((0x21, a, b, c))
+            return body + bytes(((~sum(body)) & 0xFF,))
+        ev = []
+        data = b"xx" + pkt(66, 53, 49) + b"!?" + pkt(74, 50, 156) + pkt(74, 0x21, 0x42) + b"!B5"
+        left = rc.parse_packets(data[:7], ev)          # packets can arrive in pieces
+        left = rc.parse_packets(left + data[7:], ev)
+        self.assertEqual(ev, [(5, True), ("J", 50, -100), ("J", 33, 66)])
+        self.assertEqual(left, b"!B5")
+        bad = bytearray(pkt(74, 10, 10)); bad[4] ^= 1
+        ev = []
+        self.assertEqual(rc.parse_packets(bytes(bad) + pkt(66, 49, 49), ev), b"")
+        self.assertEqual(ev, [(1, True)])
+
+    def test_arrow_speeds_up_gently_and_stops_quicker(self):
+        robot, rc = self.drive([(0, (5, True)), (2000, (5, False))])
+        speeds = [l for t, l, a in robot.drives if t <= 2000]
+        self.assertLess(speeds[1], 2, "no jump to full speed")
+        self.assertEqual(speeds, sorted(speeds), "only ever speeds up")
+        self.assertEqual(self.at(robot, 1000)[0], rc.SPEED)
+        up_ms = next(t for t, l, a in robot.drives if l == rc.SPEED)
+        down_ms = next(t for t, l, a in robot.drives if t > 2000 and l == 0) - 2000
+        self.assertLess(down_ms, up_ms)
+        self.assertGreater(down_ms, 60, "but no instant stop either")
+
+    def test_joystick_is_proportional_and_curves(self):
+        beats = [(t, ("J", 0, 50)) for t in range(0, 1500, 150)]      # the page repeats itself while held
+        beats += [(t, ("J", 100, 100)) for t in range(1500, 2000, 150)]
+        robot, rc = self.drive(beats + [(2000, ("J", 0, 0))])
+        self.assertAlmostEqual(self.at(robot, 1400)[0], rc.SPEED / 2)
+        linear, angular = self.at(robot, 1990)
+        self.assertAlmostEqual(linear, rc.SPEED)
+        self.assertAlmostEqual(angular, -rc.TURN, msg="stick right = turn right")
+        self.assertEqual(self.at(robot, 3000), (0, 0))
+
+    def test_joystick_going_quiet_stops_the_robot(self):
+        robot, rc = self.drive([(0, ("J", 0, 100))])
+        self.assertEqual(self.at(robot, 500)[0], rc.SPEED)
+        self.assertEqual(self.at(robot, rc.STICK_TIMEOUT_MS + 400), (0, 0))
+
+    def test_reversing_direction_goes_through_zero(self):
+        robot, rc = self.drive([(0, (5, True)), (1000, (5, False)), (1000, (6, True))])
+        after = [l for t, l, a in robot.drives if t > 1000]
+        self.assertIn(0, after[:after.index(-rc.SPEED)])
+
+    def test_bumper_slows_then_stops_at_once_and_lights_red(self):
+        def distance(t):                      # a wall coming closer, then gone
+            d = 100 if t < 1000 else 21 if t < 2000 else 5 if t < 3000 else 100
+            return (None, d, d, d, None)
+        robot, rc = self.drive([(0, (5, True))], until=3900, distance=distance)
+        self.assertEqual(self.at(robot, 900)[0], rc.SPEED)
+        self.assertAlmostEqual(self.at(robot, 1500)[0], rc.SPEED / 2)
+        self.assertEqual(self.at(robot, 2040)[0], 0, "stops at once")
+        self.assertEqual(robot.colour_at(2500)[0], RED)
+        self.assertEqual(robot.colour_at(3800)[0], WHITE)
+        self.assertGreater(self.at(robot, 3800)[0], 0, "drives on when the way is clear")
+
+    def test_bumper_does_not_stop_reversing(self):
+        robot, rc = self.drive([(0, (6, True))], distance=lambda t: (5,) * 5)
+        self.assertEqual(self.at(robot, 1000)[0], -rc.SPEED)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
