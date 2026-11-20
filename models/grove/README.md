@@ -73,11 +73,50 @@ hold the lid over the board before snapping it on.
 
 ## Before buying a module
 
-The Alvik's two Grove ports are I2C only and give 3.3 V (Arduino's datasheet, AKX00066). A module that
-talks serial (UART) or needs a PWM pin or 5 V fits a holder but will not work from that port as it is.
-Pick modules that say I2C and 3.3 V. Of the two with lids here: the Speech Recognizer runs at 3.3 V but
-talks serial at 9600 baud, and the Speaker wants 4 to 5.5 V and a plain output pin. Neither has been
-tried on the robot.
+A holder only holds the board. Whether the board works on the robot is a separate question, and for the
+two with lids here the answer is no.
+
+### What the robot's sockets are
+
+From Arduino's datasheet and user manual for the Alvik (AKX00066):
+
+- Two Grove and two Qwiic sockets at the back, all four on one I2C bus.
+- Same pins on both kinds: 1 SCL, 2 SDA, 3 +3.3 V, 4 GND. On the robot's main chip SCL is pin 12 and
+  SDA is pin 11.
+- I2C only: no serial, no analog or plain signal pin, no 5 V. (The only 5 V is on the servo header.)
+- The robot's own sensors (motion, colour, touch, distance) are on a different bus, so an add-on cannot
+  share an address with them. Two add-ons must not share an address with each other.
+- The robot's second chip (the STM32) is on the add-on bus too, so the two wires cannot be borrowed
+  for something that is not I2C.
+- Power reaches the sockets through a protection part. Arduino does not say how much current it
+  allows, and there is no public schematic.
+- The sockets have power only when the robot's switch is on. A USB cable alone does not power them.
+
+So: pick modules that say I2C and 3.3 V, and start with a small one.
+
+The one add-on Arduino shows working is a SparkFun Qwiic OLED display on a Qwiic socket, with
+MicroPython code, in the "Add Qwiic" part of
+[the user manual](https://docs.arduino.cc/tutorials/alvik/user-manual/).
+
+### What was tried on the real robot (November 2026)
+
+One module at a time on a Grove socket, read over USB:
+
+- **Bus scan:** something answers at `0x28` whether or not the plugged-in module answers, so it is
+  taken to be the robot's own. A scan with nothing plugged in was not done. With the switch off both
+  wires read low.
+- **Grove - Speaker:** not tried. It wants 4 to 5.5 V and a plain output pin, and gives no data back.
+- **Grove - Speech Recognizer:** does not work here. It talks serial at 9600 baud (Seeed's schematic
+  puts its talk wire on Grove pin 1), not I2C. Plugged in, both its lights came on at power-up and
+  stayed on, which is not what Seeed describes, and the robot received nothing in 110 seconds of
+  listening on both wires while it was spoken to. Whether it would run from another supply is not known.
+- **Grove Vision AI V2:** the right kind (I2C at 3.3 V) and the robot found it at `0x62`, the address
+  Seeed gives. With its camera on it dropped off the bus for about 0.2 s every 6 s, answered "nothing
+  waiting" for about 0.3 s after each restart, and never answered a command. With the camera off it
+  did not answer at all and the clock wire stayed low. It had not been set up with a model from a
+  computer first, so this may be the module and not the socket.
+
+Still not known: how much current the sockets can give, and what the thing at `0x28` is.
 
 ## Others' holders
 
