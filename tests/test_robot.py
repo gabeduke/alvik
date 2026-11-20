@@ -78,6 +78,9 @@ class FakeAlvik:
         self.heading = lambda t: 0
         self.tilt = (0, 0)                 # roll, pitch
         self.battery = 80
+        self.lines = (0, 0, 0)             # line sensors: left, centre, right
+        self.colour = (None, None, None)   # floor colour, each 0..1
+        self.bottom = self.top = None      # cm: what the distance sensor sees low down and high up
         self.left_led = Led(self, "L")
         self.right_led = Led(self, "R")
 
@@ -94,7 +97,13 @@ class FakeAlvik:
     def get_touch_left(self): return self._touch("left")
     def get_touch_right(self): return self._touch("right")
     def get_distance(self): return self.distance(CLOCK.now)
-    def get_line_sensors(self): return (0, 0, 0)
+    def get_line_sensors(self): return self.lines
+    def get_color(self, color_format="rgb"):
+        if self.colour == "broken":        # a calibration with white = black: the library divides by zero
+            raise ZeroDivisionError("divide by zero")
+        return self.colour
+    def get_distance_bottom(self): return self.bottom
+    def get_distance_top(self): return self.top
     def get_pose(self): return (0, 0, self.heading(CLOCK.now))
     def get_orientation(self): return self.tilt + (self.heading(CLOCK.now),)
     def get_battery_charge(self): return self.battery
@@ -537,7 +546,12 @@ class Telemetry(RobotTest):
         import remote_control as rc
         with open(os.path.join(REPO, "tests", "telemetry_vectors.json")) as f:
             for case in json.load(f):
-                pkt = rc.sensor_packet(**case["sensors"]) if "sensors" in case else rc.telemetry_packet(**case["robot"])
+                if "sensors" in case:
+                    pkt = rc.sensor_packet(**case["sensors"])
+                elif "under" in case:
+                    pkt = rc.under_packet(**case["under"])
+                else:
+                    pkt = rc.telemetry_packet(**case["robot"])
                 self.assertEqual(pkt.hex(), case["hex"], case["note"])
 
     def test_request_packet_is_parsed(self):
@@ -552,12 +566,12 @@ class Telemetry(RobotTest):
         robot, rc = self.drive([(0, (5, True))])
         self.assertEqual(rc._link.sent, [])
 
-    def test_about_five_a_second_with_heading_distance_and_speed(self):
+    def test_about_eight_a_second_with_heading_distance_and_speed(self):
         robot, rc = self.drive([self.ASK, (0, ("J", 0, 100))] + [(t, ("J", 0, 100)) for t in range(150, 3000, 150)],
                                until=3000, heading=lambda t: 400 if t > 2000 else 12.34,
                                distance=lambda t: (3, None, 61.6, 80, 3))
         times = [when for when, p in rc._link.sent if p[1:2] == b"T"]
-        self.assertTrue(13 <= len(times) <= 16, len(times))
+        self.assertTrue(23 <= len(times) <= 30, len(times))
         self.assertTrue(all(b - a >= rc.TELEMETRY_MS for a, b in zip(times, times[1:])))
         t = self.told(rc, 1500)
         self.assertEqual((t["heading"], t["distance"], t["speed"], t["turn"]), (12.3, 62, rc.SPEED, 0))
@@ -590,22 +604,43 @@ class Telemetry(RobotTest):
         t = self.told(rc, 5500)
         self.assertEqual((t["dancing"], t["left"], t["turn"]), (False, WHITE, 0))
 
-    def test_sensors_packet_follows_each_telemetry_packet(self):
+    def test_sensors_and_under_packets_follow_each_telemetry_packet(self):
         def setup_distance(t):
             return (40, None, 12.4, 300, 7)
         import remote_control
         remote_control._link = TimedLink([self.ASK])
         robot = FakeAlvik()
         robot.distance, robot.tilt, robot.battery = setup_distance, (-12.4, 30.6), 67
+        robot.lines, robot.colour, robot.bottom, robot.top = (52, 610, 1023), (0.52, 0.32, 0.22), 7.4, None
         robot.presses = [(1000, 10 ** 9, "cancel")]
         remote_control.run_remote(robot)
         kinds = [p[1:2] for when, p in remote_control._link.sent]
-        self.assertEqual(kinds[:4], [b"T", b"S", b"T", b"S"])
+        self.assertEqual(kinds[:6], [b"T", b"S", b"U", b"T", b"S", b"U"])
         s = remote_control._link.sent[1][1]
         self.assertEqual(len(s), 11)
         self.assertEqual((~sum(s[:10])) & 0xFF, s[10])
         self.assertEqual(list(s[2:7]), [40, 255, 12, 254, 7])
         self.assertEqual((s[7] - 256, s[8], s[9]), (-12, 31, 67))
+        u = remote_control._link.sent[2][1]
+        self.assertEqual(len(u), 11)
+        self.assertEqual((~sum(u[:10])) & 0xFF, u[10])
+        self.assertEqual(list(u[2:10]), [13, 152, 254, 52, 32, 22, 7, 255])
+
+    def test_a_broken_colour_calibration_does_not_stop_the_driving(self):
+        import remote_control
+        remote_control._link = TimedLink([self.ASK, (0, (5, True))])
+        robot = FakeAlvik()
+        robot.colour, robot.lines, robot.bottom = "broken", (52, 52, 52), 7
+        robot.presses = [(2000, 10 ** 9, "cancel")]
+        self.assertEqual(remote_control.run_remote(robot), -1)
+        self.assertEqual([d for d in robot.drives if d[0] <= 1500][-1][1], remote_control.SPEED)
+        u = [p for when, p in remote_control._link.sent if p[1:2] == b"U"][-1]
+        self.assertEqual(list(u[2:10]), [13, 13, 13, 255, 255, 255, 7, 255])
+
+    def test_under_packet_copes_with_a_robot_that_knows_nothing_yet(self):
+        robot, rc = self.drive([self.ASK], until=500)      # the pretend Alvik starts with no readings
+        u = [p for when, p in rc._link.sent if p[1:2] == b"U"][0]
+        self.assertEqual(list(u[2:10]), [0, 0, 0, 255, 255, 255, 255, 255])
 
     def test_a_new_phone_has_to_ask_again(self):
         robot, rc = self.drive([self.ASK, (1000, "lost")], until=3000)

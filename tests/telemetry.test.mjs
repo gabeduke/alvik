@@ -2,10 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parseTelemetry, parseSensors, telemetryReader, telemetryRequest, TELEMETRY_LEN, SENSORS_LEN } from "../docs/telemetry.js";
+import { parseTelemetry, parseSensors, parseUnder, telemetryReader, telemetryRequest, TELEMETRY_LEN, SENSORS_LEN, UNDER_LEN } from "../docs/telemetry.js";
 
 const all = JSON.parse(readFileSync(new URL("./telemetry_vectors.json", import.meta.url), "utf8"));
-const vectors = all.filter((v) => v.robot), sensorVectors = all.filter((v) => v.sensors);
+const vectors = all.filter((v) => v.robot), sensorVectors = all.filter((v) => v.sensors), underVectors = all.filter((v) => v.under);
 const bytes = (hex) => Uint8Array.from(hex.match(/../g), (h) => parseInt(h, 16));
 
 test("parses the shared example packets", () => {
@@ -25,14 +25,33 @@ test("parses the shared sensors packets", () => {
   }
 });
 
-test("reader hands out both kinds, and an old page's reader would skip sensors", () => {
+test("parses the shared under-the-robot packets", () => {
+  assert.ok(underVectors.length >= 3);
+  for (const v of underVectors) {
+    assert.equal(bytes(v.hex).length, UNDER_LEN);
+    assert.deepEqual(parseUnder(bytes(v.hex)), v.page, v.note);
+    assert.equal(parseTelemetry(bytes(v.hex)), null);
+    assert.equal(parseSensors(bytes(v.hex)), null);
+  }
+});
+
+test("reader hands out all three kinds, and a reader that isn't told about one skips it", () => {
   const got = [];
-  const feed = telemetryReader((t) => got.push(["T", t]), (s) => got.push(["S", s]));
-  feed([...bytes(vectors[0].hex), ...bytes(sensorVectors[0].hex), ...bytes(vectors[1].hex)]);
-  assert.deepEqual(got, [["T", vectors[0].page], ["S", sensorVectors[0].page], ["T", vectors[1].page]]);
+  const feed = telemetryReader((t) => got.push(["T", t]), (s) => got.push(["S", s]), (u) => got.push(["U", u]));
+  const stream = [...bytes(vectors[0].hex), ...bytes(sensorVectors[0].hex), ...bytes(underVectors[0].hex), ...bytes(vectors[1].hex)];
+  feed(stream);
+  assert.deepEqual(got, [["T", vectors[0].page], ["S", sensorVectors[0].page], ["U", underVectors[0].page], ["T", vectors[1].page]]);
   const only = [];
-  telemetryReader((t) => only.push(t))([...bytes(sensorVectors[0].hex), ...bytes(vectors[1].hex)]);
-  assert.deepEqual(only, [vectors[1].page]);
+  telemetryReader((t) => only.push(t))(stream);
+  assert.deepEqual(only, [vectors[0].page, vectors[1].page]);
+});
+
+test("a letter from newer robot code is skipped, whatever its bytes look like", () => {
+  // 'Q' is not a packet yet. Its body holds a '!' 'T' that is not a real packet, right before a real one.
+  const got = [];
+  const feed = telemetryReader((t) => got.push(["T", t]), (s) => got.push(["S", s]), (u) => got.push(["U", u]));
+  feed([0x21, 0x51, 0x21, 0x54, 7, ...bytes(underVectors[1].hex), ...bytes(vectors[2].hex)]);
+  assert.deepEqual(got, [["U", underVectors[1].page], ["T", vectors[2].page]]);
 });
 
 test("rejects damaged, short and other packets", () => {

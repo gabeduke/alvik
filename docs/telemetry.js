@@ -1,5 +1,5 @@
 // Telemetry from the robot (src/remote_control.py, telemetry_packet), for the 3D robot on the remote.
-// It comes as notifications on the Nordic UART TX characteristic, about 5 times a second, but only
+// It comes as notifications on the Nordic UART TX characteristic, about 8 times a second, but only
 // after the page asks for it with telemetryRequest(true).
 //
 //   '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
@@ -19,12 +19,27 @@
 //     roll, pitch   int8, whole degrees, as the robot's IMU reports them
 //     battery       0..100 percent; 255 = not known
 //
+// and a third with what is under the robot (again, older robot code doesn't send it):
+//
+//   '!' 'U' <line left> <line centre> <line right> <red> <green> <blue> <bottom> <top> <checksum>
+//     line sensors  the raw reading in steps of 4 (0..254, so 0..1016): a pale floor reads low, a
+//                   black line or no floor at all reads high; 255 = not known
+//     red, green, blue   the floor's colour, 0..100: how far each is from black to white, as the
+//                   Alvik library works it out; 255 = not known
+//     bottom, top   cm to what the distance sensor sees low down and high up in front. On the floor,
+//                   bottom is the floor just ahead (about 7); it grows when the robot is picked up.
+//                   255 = nothing seen
+//
+// A new kind of reading gets a new letter: these layouts never change, and a reader skips letters
+// it doesn't know.
+//
 // tests/telemetry_vectors.json holds example packets that both this file and the robot code are
 // tested against.
 
 export const NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // robot talks here
 export const TELEMETRY_LEN = 10;
 export const SENSORS_LEN = 11;
+export const UNDER_LEN = 11;
 
 const checksum = (bytes, n) => {
   let sum = 0;
@@ -67,9 +82,28 @@ export function parseSensors(bytes) {
   };
 }
 
+/** One whole under-the-robot packet (11 bytes) -> the readings, or null if it is not a good packet. */
+export function parseUnder(bytes) {
+  if (bytes.length !== UNDER_LEN || bytes[0] !== 0x21 || bytes[1] !== 0x55) return null;
+  if (checksum(bytes, UNDER_LEN - 1) !== bytes[UNDER_LEN - 1]) return null;
+  const colour = [...bytes.slice(5, 8)];
+  return {
+    lines: [...bytes.slice(2, 5)].map((v) => (v === 255 ? null : v * 4)),   // raw, left to right: dark reads high
+    floor: colour.includes(255) ? null : colour.map((v) => v / 100),       // [r, g, b], each 0..1
+    bottom: bytes[8] === 255 ? null : bytes[8],                             // cm
+    top: bytes[9] === 255 ? null : bytes[9],                                // cm
+  };
+}
+
 /** Feed it whatever arrives (packets can come in pieces, or with junk between): calls onPacket for
- *  each good telemetry packet and onSensors for each good sensors packet. Returns the function to feed. */
-export function telemetryReader(onPacket, onSensors = () => {}) {
+ *  each good telemetry packet, onSensors for each good sensors packet and onUnder for each good
+ *  under-the-robot packet. Returns the function to feed. */
+export function telemetryReader(onPacket, onSensors = () => {}, onUnder = () => {}) {
+  const kinds = {
+    0x54: [TELEMETRY_LEN, parseTelemetry, onPacket],
+    0x53: [SENSORS_LEN, parseSensors, onSensors],
+    0x55: [UNDER_LEN, parseUnder, onUnder],
+  };
   let buf = [];
   return (chunk) => {
     buf.push(...chunk);
@@ -78,13 +112,14 @@ export function telemetryReader(onPacket, onSensors = () => {}) {
       if (i < 0) { buf = []; return; }
       if (i) buf = buf.slice(i);
       if (buf.length < 2) return;
-      if (buf[1] !== 0x54 && buf[1] !== 0x53) { buf.shift(); continue; }
-      const sensors = buf[1] === 0x53, len = sensors ? SENSORS_LEN : TELEMETRY_LEN;
+      const kind = kinds[buf[1]];
+      if (!kind) { buf.shift(); continue; }                              // a letter we don't know: skip it
+      const [len, parse, hand] = kind;
       if (buf.length < len) return;
-      const t = (sensors ? parseSensors : parseTelemetry)(buf.slice(0, len));
+      const t = parse(buf.slice(0, len));
       if (!t) { buf.shift(); continue; }                                 // damaged: find the next '!'
       buf = buf.slice(len);
-      (sensors ? onSensors : onPacket)(t);
+      hand(t);
     }
   };
 }

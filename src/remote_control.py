@@ -9,8 +9,9 @@
 #   3      : disco dance (flashing lights, wiggle, then a spin)
 #   4      : bumper on / off (stops before driving into things — on by default)
 #
-# The web remote also asks for telemetry (see telemetry_packet): where the robot is pointing, what is
-# in front, its lights and speed, about 5 times a second, for the 3D robot on the page.
+# The web remote also asks for telemetry (see telemetry_packet): where the robot is pointing, its
+# lights and speed, about 8 times a second, for the 3D robot on the page. Two more packets follow
+# each one: the sensors in front (sensor_packet) and the ones underneath (under_packet).
 #
 # Lights while in this mode: yellow = waiting for a phone, then your headlight colour.
 # With the bumper on they blink red as it slows down for something, and flash fast when it stops.
@@ -35,7 +36,7 @@ TURN_ACCEL = 540     # deg/s per second, for turning
 STICK_TIMEOUT_MS = 600   # joystick goes quiet for this long -> stop (the page froze or went away)
 SLOW_FLASH_MS = 300      # lights blink red this slowly while the bumper is slowing the robot down
 STOP_FLASH_MS = 120      # and this fast once it has stopped it
-TELEMETRY_MS = 200       # how often the web page is told what the robot is doing (when it asked)
+TELEMETRY_MS = 100       # how often the web page is told what the robot is doing (when it asked)
 COLORS = [(1, 1, 1), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 0), (0, 0, 0)]
 # the dance itself (lights, wiggle, spin) is in dance.py
 
@@ -129,6 +130,11 @@ def _int8(v, scale):
     return max(-127, min(127, v)) & 0xFF
 
 
+def _cm(v):
+    """A distance in cm as one byte: 0..254, and 255 for 'nothing seen'."""
+    return 255 if v is None else max(0, min(254, int(round(v))))
+
+
 def telemetry_packet(heading, distance, left, right, linear, angular,
                      turbo=False, bumper=True, blocked=False, dancing=False):
     """What the robot is doing, for the 3D robot on the web remote (docs/telemetry.js reads it).
@@ -142,27 +148,55 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
     Checksum as for the other packets: ~(sum of the bytes before it) & 0xFF."""
     h = int(round((heading or 0) * 10))
     h = ((h + 1800) % 3600 - 1800) & 0xFFFF
-    d = 255 if distance is None else max(0, min(254, int(round(distance))))
     lights = 0
     for i, on in enumerate(tuple(left) + tuple(right)):
         if on:
             lights |= 1 << i
     flags = (1 if turbo else 0) | (2 if bumper else 0) | (4 if blocked else 0) | (8 if dancing else 0)
-    body = bytes((0x21, 84, h & 0xFF, h >> 8, d, lights, _int8(linear, 5), _int8(angular, 1 / 3), flags))
+    body = bytes((0x21, 84, h & 0xFF, h >> 8, _cm(distance), lights, _int8(linear, 5), _int8(angular, 1 / 3), flags))
     return body + bytes(((~sum(body)) & 0xFF,))
 
 
 def sensor_packet(distances, roll, pitch, battery):
-    """The other sensors, sent right after telemetry_packet (docs/telemetry.js reads it).
+    """The sensors in front, sent right after telemetry_packet (docs/telemetry.js reads it).
     11 bytes:  '!' 'S' <5 distances> <roll> <pitch> <battery> <checksum>
       distances  cm, the five readings from left to right, 0..254; 255 = nothing seen
       roll, pitch  int8, whole degrees, as the IMU reports them
       battery    0..100 percent; 255 = not known"""
-    d = [255 if x is None else max(0, min(254, int(round(x)))) for x in tuple(distances)[:5]]
+    d = [_cm(x) for x in tuple(distances)[:5]]
     d += [255] * (5 - len(d))
     b = 255 if battery is None else max(0, min(100, int(battery)))
     body = bytes([0x21, 83] + d + [_int8(roll or 0, 1), _int8(pitch or 0, 1), b])
     return body + bytes(((~sum(body)) & 0xFF,))
+
+
+def under_packet(lines, colour, bottom, top):
+    """What is under the robot, sent right after sensor_packet (docs/telemetry.js reads it).
+    11 bytes:  '!' 'U' <3 line sensors> <red> <green> <blue> <bottom> <top> <checksum>
+      line sensors  left, centre, right: the raw reading in steps of 4, 0..254 (so 0..1016; a pale
+                    floor reads low, a black line or no floor at all reads high); 255 = not known
+      red, green, blue  the floor's colour, 0..100: how far each is from black to white, as the
+                    Alvik library works it out (get_color); 255 = not known
+      bottom, top   cm to what the distance sensor sees low down and high up in front, 0..254.
+                    On the floor, bottom is the floor just ahead (about 7); it grows when the robot
+                    is picked up. 255 = nothing seen"""
+    body = [0x21, 85]
+    for v in (tuple(lines) + (None,) * 3)[:3]:
+        body.append(255 if v is None else max(0, min(254, int(v) // 4)))
+    for v in (tuple(colour) + (None,) * 3)[:3]:
+        body.append(255 if v is None else max(0, min(100, int(round(v * 100)))))
+    body = bytes(body + [_cm(bottom), _cm(top)])
+    return body + bytes(((~sum(body)) & 0xFF,))
+
+
+def floor_colour(alvik):
+    """The floor's colour as (red, green, blue), each 0..1, or Nones. A colour calibration gone
+    wrong (black and white saved over the same floor) makes the library raise: never let that stop
+    the driving."""
+    try:
+        return alvik.get_color()
+    except Exception:
+        return (None, None, None)
 
 
 class PhoneLink:
@@ -359,6 +393,8 @@ def run_remote(alvik):
                 linear, angular, turbo, bumper, blocked, bool(move)))
             roll, pitch, _ = alvik.get_orientation()
             _link.send(sensor_packet(alvik.get_distance(), roll, pitch, alvik.get_battery_charge()))
+            _link.send(under_packet(alvik.get_line_sensors(), floor_colour(alvik),
+                                    alvik.get_distance_bottom(), alvik.get_distance_top()))
         sleep_ms(30)
 
     alvik.brake()

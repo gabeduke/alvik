@@ -223,8 +223,9 @@ import { NUS_TX, telemetryRequest, telemetryReader } from "./telemetry.js";   //
 //   '!' 'J' <x> <y> <checksum>     signed bytes -100..100, x right, y forward
 // Checksum = ~(sum of the first 4 bytes) & 0xff. The robot stops if joystick packets stop coming
 // for 0.6 s, so while the stick is held we repeat it.
-// The robot talks back too (telemetry.js): heading, distance, lights, speed, turbo and bumper, five
-// times a second once we ask. That drives the 3D robot (twin.js) and the Turbo / Bumper labels.
+// The robot talks back too (telemetry.js): heading, lights, speed, turbo and bumper, then what its
+// sensors see in front and underneath, about eight times a second once we ask. That drives the
+// 3D robot (twin.js) and the Turbo / Bumper labels.
 const NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const RX  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // robot listens here
 
@@ -408,6 +409,10 @@ function onSensors(s) {
   twin?.sensors(s);
   showBattery(s.battery);
 }
+// The third packet: what is under the robot (line sensors, the floor's colour, how far down the floor is).
+function onUnder(u) {
+  twin?.under(u);
+}
 function showBattery(pct) {
   const el = $("twinBattery");
   el.textContent = pct === null || pct === undefined ? "" : `${pct < 20 ? "🪫" : "🔋"} ${pct}%`;
@@ -430,7 +435,7 @@ function onTelemetry(t) {
 async function listen(service) {
   try {
     const tx = await service.getCharacteristic(NUS_TX);
-    const feed = telemetryReader(onTelemetry, onSensors);
+    const feed = telemetryReader(onTelemetry, onSensors, onUnder);
     tx.addEventListener("characteristicvaluechanged", (e) => {
       const v = e.target.value;
       feed(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));

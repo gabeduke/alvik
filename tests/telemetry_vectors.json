@@ -274,5 +274,97 @@
    "pitch": 127,
    "battery": null
   }
+ },
+ {
+  "note": "under: on a wooden desk, as the real robot read it",
+  "under": {
+   "lines": [
+    52,
+    53,
+    53
+   ],
+   "colour": [
+    0.52,
+    0.32,
+    0.22
+   ],
+   "bottom": 7.4,
+   "top": 35.2
+  },
+  "hex": "21550d0d0d3420160723ce",
+  "page": {
+   "lines": [
+    52,
+    52,
+    52
+   ],
+   "floor": [
+    0.52,
+    0.32,
+    0.22
+   ],
+   "bottom": 7,
+   "top": 35
+  }
+ },
+ {
+  "note": "under: held in the air over nothing, readings past the ends are clipped",
+  "under": {
+   "lines": [
+    1023,
+    2000,
+    0
+   ],
+   "colour": [
+    0,
+    1.2,
+    -0.1
+   ],
+   "bottom": 43.6,
+   "top": null
+  },
+  "hex": "2155fefe000064002cfffe",
+  "page": {
+   "lines": [
+    1016,
+    1016,
+    0
+   ],
+   "floor": [
+    0,
+    1,
+    0
+   ],
+   "bottom": 44,
+   "top": null
+  }
+ },
+ {
+  "note": "under: nothing known yet, and a ceiling far away",
+  "under": {
+   "lines": [
+    null,
+    null,
+    null
+   ],
+   "colour": [
+    null,
+    null,
+    null
+   ],
+   "bottom": null,
+   "top": 300
+  },
+  "hex": "2155fffffffffffffffe92",
+  "page": {
+   "lines": [
+    null,
+    null,
+    null
+   ],
+   "floor": null,
+   "bottom": null,
+   "top": 254
+  }
  }
 ]

@@ -39,7 +39,7 @@ test("the page's files are all in the service worker shell and exist", () => {
   const sw = readFileSync(join(docs, "sw.js"), "utf8");
   const shell = JSON.parse(sw.match(/const SHELL = (\[[\s\S]*?\]);/)[1].replace(/,\s*\]/, "]"));
   for (const f of shell) assert.ok(existsSync(join(docs, f === "./" ? "index.html" : f)), f);
-  for (const f of ["telemetry.js", "twin.js", "models/alvik.glb", "vendor/three/three.module.min.js",
+  for (const f of ["telemetry.js", "sensing.js", "twin.js", "models/alvik.glb", "vendor/three/three.module.min.js",
     "vendor/three/loaders/GLTFLoader.js", "vendor/three/utils/BufferGeometryUtils.js"]) assert.ok(shell.includes(f), f);
   const page = readFileSync(join(docs, "index.html"), "utf8");
   assert.match(page, /"three": "\.\/vendor\/three\/three\.module\.min\.js"/, "import map for the addons");
