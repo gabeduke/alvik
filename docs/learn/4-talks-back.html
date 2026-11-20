@@ -5,101 +5,70 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1b1630">
 <title>📡 The robot talks back · Alvik lessons</title>
-<meta name="description" content="Lesson 4: The robot starts sending news, and a 3D robot on the screen copies it.">
+<meta name="description" content="Lesson 4: The robot sends news, and a 3D robot on the screen copies it.">
 <meta property="og:title" content="📡 The robot talks back · Alvik lessons">
-<meta property="og:description" content="Lesson 4: The robot starts sending news, and a 3D robot on the screen copies it.">
+<meta property="og:description" content="Lesson 4: The robot sends news, and a 3D robot on the screen copies it.">
 <meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="learn.css">
+<link rel="stylesheet" href="../app.css">
 </head>
-<body>
-<header class="top">
-  <a class="home" href="./">📚 Alvik lessons</a>
-  <a class="chip" href="../?demo">🎮 Pretend robot</a>
-  <a class="chip" href="../">🤖 Remote</a>
-</header>
+<body class="tabbed">
+<header class="top"><a class="home" href="./">📚 Alvik lessons</a></header>
 
 <p class="kicker">Lesson 4 of 9 · about 20 minutes</p>
 <h1>📡 The robot talks back</h1>
-<p class="lead">So far the page talks and the robot listens. Now the robot starts <b>talking back</b>,
-  and a 3D robot on the screen copies what the real one does. This is where it starts to feel like magic.</p>
+<p class="lead">Now the robot sends news back, and a 3D robot on the screen copies the real one.</p>
 
 <section class="need">
   <h2>🧰 You need</h2>
   <ul><li>The robot and remote from <a href="2-drive.html">lesson 2</a>, or the pretend robot.</li></ul>
   <a class="go real" href="../?show=">🤖 Open the remote</a>
   <a class="go" href="../?demo&amp;show=">🎮 Pretend robot</a>
-  <p class="muted small">These links show only this lesson's part of the 3D robot: turning, wheels and lights.</p>
 </section>
 
 <section>
   <h2>▶️ Do it</h2>
   <ol class="steps">
-    <li>Put the robot on the floor <b>pointing away from you</b>, then connect. The 3D robot starts out pointing away from you too.</li>
-    <li>Turn the robot on the spot with the joystick. The 3D robot turns the same way, and its wheels spin the way the real ones do.</li>
-    <li>Press <b>💡 Lights</b> a few times. The strips on the 3D robot take the colour of the real lights.</li>
-    <li>Press <b>🪩 Disco</b> and watch both of them dance.</li>
-    <li>Walk round to the other side of the robot. Now left and right look swapped. Point the real robot away from you again and tap <b>🧭</b> to line the two up.</li>
+    <li>Point the robot <b>away from you</b>, then connect.</li>
+    <li>Turn it on the spot. The 3D robot turns too, wheels and all.</li>
+    <li>Press <b>💡 Lights</b> and <b>🪩 Disco</b>. The 3D robot copies them.</li>
+    <li>If the two get out of line, point the robot away from you and tap <b>🧭</b>.</li>
   </ol>
 </section>
 
 <section>
   <h2>🔍 How it works</h2>
-  <p>When the page connects it sends one more packet, a polite question: <code>!</code> <code>T</code> <code>1</code>,
-    "please tell me what you are doing". From then on, about eight times a second, the robot sends
-    back a ten-byte packet of news called <b>telemetry</b>. Here is one of the examples the code is tested with:</p>
+  <p>On connect, the page asks <code>!</code> <code>T</code> <code>1</code>: "tell me what you are doing".
+    Then about eight times a second the robot sends a ten-byte <b>telemetry</b> packet:</p>
   <div class="bytes">
     <span>21<small>start !</small></span><span>54<small>letter T</small></span><span>7B 00<small>heading</small></span><span>17<small>distance</small></span><span>24<small>lights</small></span><span>41<small>speed</small></span><span>00<small>turn</small></span><span>03<small>switches</small></span><span class="sum">90<small>checksum</small></span>
   </div>
   <div class="scroll"><table>
-    <tr><th>Bytes</th><th>Means</th><th>In this packet</th></tr>
-    <tr><td><code>7B 00</code></td><td>Which way it points, in tenths of a degree. Turning left counts up.</td><td>123, so 12.3° to the left</td></tr>
-    <tr><td><code>17</code></td><td>What is in front, in cm (lesson 6). 255 means nothing.</td><td>23 cm</td></tr>
-    <tr><td><code>24</code></td><td>The lights: one bit each for red, green and blue, left then right.</td><td>both blue</td></tr>
-    <tr><td><code>41</code></td><td>Speed, in fifths of a cm/s.</td><td>65, so 13 cm/s</td></tr>
-    <tr><td><code>00</code></td><td>How fast it is turning, in steps of 3 degrees a second.</td><td>not turning</td></tr>
-    <tr><td><code>03</code></td><td>Switches: turbo, bumper, stopped by the bumper, dancing.</td><td>turbo on, bumper on</td></tr>
+    <tr><th>Bytes</th><th>Means</th><th>Here</th></tr>
+    <tr><td><code>7B 00</code></td><td>Heading, tenths of a degree, left = up</td><td>12.3° left</td></tr>
+    <tr><td><code>17</code></td><td>Distance ahead, cm (255 = nothing)</td><td>23 cm</td></tr>
+    <tr><td><code>24</code></td><td>Lights: a bit each for R, G, B, left then right</td><td>both blue</td></tr>
+    <tr><td><code>41</code></td><td>Speed, fifths of a cm/s</td><td>13 cm/s</td></tr>
+    <tr><td><code>00</code></td><td>Turning, 3°/s steps</td><td>not turning</td></tr>
+    <tr><td><code>03</code></td><td>Turbo, bumper, blocked, dancing</td><td>turbo, bumper</td></tr>
   </table></div>
-  <p class="muted small">Written in hexadecimal, the way programmers write bytes: <code>7B</code> is 123 and <code>41</code> is 65.</p>
-  <p>Why squeeze it into ten bytes? A Bluetooth message of this kind holds about twenty, and the less
-    the robot has to send, the more often it can send it. So every number is scaled to fit: the speed
-    is counted in fifths so that one byte reaches 25 cm/s both ways.</p>
-  <p>The robot builds the packet in <code>telemetry_packet()</code> in
-    <a href="https://github.com/gabeduke/alvik/blob/main/src/remote_control.py"><code>remote_control.py</code></a>,
-    and the page takes it apart again in
-    <a href="https://github.com/gabeduke/alvik/blob/main/docs/telemetry.js"><code>telemetry.js</code></a>.
-    Two programs in two languages have to agree on every byte. So there is one file of example
-    packets, and both are tested against it.</p>
-
-  <h3>How does it know which way it points?</h3>
-  <p>The Alvik has no compass in this code. It counts how far each wheel has turned. If the left
-    wheel has rolled further than the right one, the robot must have turned right. Working out where
-    you are from your own wheels is called <b>odometry</b>. A robot vacuum cleaner does it, and so
-    does a sailor counting knots.</p>
-  <p>It is not perfect, and that is worth seeing for yourself. Try the first two experiments below.</p>
-
-  <h3>Why doesn't it lag?</h3>
-  <p>News that arrives eight times a second would make the 3D robot turn in jerks. So between
-    packets the page keeps turning it at the speed the robot last reported, and it draws the robot a
-    tiny bit ahead of the last news, because by the time news arrives it is already old.</p>
+  <p>Heading comes from <b>odometry</b>: counting how far each wheel has turned. No compass.</p>
 </section>
 
 <section class="try">
   <h2>🧪 Try this</h2>
   <ul>
-    <li><b>Fool it.</b> Pick the real robot up and push the joystick left. The wheels spin in the air. What does the 3D robot do? (With the pretend robot, tap 🫳 to pick it up.)</li>
-    <li><b>Fool it the other way.</b> Let go of the joystick, hold the robot in the air so its wheels don't turn, and turn round with it. Does the 3D robot notice? Why not?</li>
-    <li><b>Drive a square</b> and come back to where you started. Is the 3D robot still lined up with the real one? Carpet and slippery floors make the wheels slip, and every slip is a small mistake that never gets fixed.</li>
-    <li><b>Read a packet.</b> The lights byte above is <code>24</code>, which is 36. In bits that is <code>100 100</code>: read each group as blue, green, red. What would <code>09</code> be? (It is in the test examples: the robot stopped by the bumper.)</li>
+    <li><b>Fool it.</b> Lift the robot and turn the stick: wheels spin in the air. What does the 3D robot do? (Pretend robot: tap 🫳.)</li>
+    <li><b>Fool it again.</b> Hold it still in the air and turn round with it. Does the 3D robot notice?</li>
+    <li><b>Drive a square</b> back to the start. Are the two still lined up?</li>
   </ul>
 </section>
 
 <section class="change">
   <h2>✏️ Change it</h2>
-  <p>The page asks for news with <code>telemetryRequest(true)</code>. An older remote, or the Bluefruit
-    app, never asks, and the robot never sends: old and new keep working together. On the robot,
-    <code>TELEMETRY_MS = 100</code> sets how often it sends. Try 500 and watch the 3D robot fall
-    behind, then catch up in steps.</p>
+  <p>On the robot, <code>TELEMETRY_MS = 100</code> sets how often it sends news. Try 500 and watch the
+    3D robot move in steps.</p>
 </section>
 
 <nav class="next">
@@ -109,5 +78,11 @@
 
 <footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
   Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+<nav class="tabbar" aria-label="Pages">
+  <a href="../"><span>🕹️</span>Drive</a>
+  <a href="./" aria-current="page"><span>📚</span>Lessons</a>
+  <a href="../flash.html"><span>🔧</span>Set up</a>
+  <a href="../#about"><span>❓</span>About</a>
+</nav>
 </body>
 </html>

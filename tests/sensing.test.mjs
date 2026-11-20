@@ -2,7 +2,7 @@
 // and the shade under a line sensor.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM,
+import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM, SLOW_CM, STOP_CM,
   newCloud, cloudAdd, cloudAlpha, CLOUD_MS, ROW_FRONT } from "../docs/sensing.js";
 
 /** The heat once it has settled on these readings. */
@@ -14,13 +14,14 @@ function settled(zones) {
 const close = (a, b, eps = 0.02) => a.every((v, i) => Math.abs(v - b[i]) < eps);
 const redder = (rgb) => rgb[0] - rgb[1];       // yellow -> orange -> red: green goes down
 
-test("yellow from 30 cm, warmer on the way in, red from 12 cm", () => {
+test("yellow from where the bumper slows, warmer on the way in, red where it stops", () => {
   const at = (cm) => heatAt(settled([cm, cm, cm, cm, cm]), 2);
-  assert.ok(close(at(36).rgb, PALE), "further than 30 cm: pale");
-  assert.ok(close(at(30).rgb, YELLOW), "30 cm: yellow");
-  assert.ok(redder(at(20).rgb) > redder(at(30).rgb), "closer is warmer");
-  assert.ok(redder(at(14).rgb) > redder(at(20).rgb));
-  assert.ok(close(at(12).rgb, RED), "12 cm: red");
+  assert.equal(SLOW_CM, 14); assert.equal(STOP_CM, 8);
+  assert.ok(close(at(20).rgb, PALE), "further than 16 cm: pale");
+  assert.ok(close(at(14).rgb, YELLOW), "14 cm: yellow");
+  assert.ok(redder(at(11).rgb) > redder(at(14).rgb), "closer is warmer");
+  assert.ok(redder(at(9).rgb) > redder(at(11).rgb));
+  assert.ok(close(at(8).rgb, RED), "8 cm: red");
   assert.ok(close(at(5).rgb, RED));
   assert.ok(at(39).alpha < at(30).alpha, "fades in from 40 cm");
   assert.equal(at(30).alpha, at(15).alpha, "and is full from 30 cm");

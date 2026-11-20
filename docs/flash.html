@@ -121,12 +121,11 @@
   #log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; background: #120e22; border-radius: 12px; padding: 10px; margin-top: 8px; font-size: 12px; }
   @media (max-width: 420px) { h1 { font-size: 24px; } .card .emoji { font-size: 34px; } #flash { font-size: 22px; padding: 16px 12px; } }
 </style>
+<link rel="stylesheet" href="app.css">
 </head>
-<body>
+<body class="tabbed">
 <header>
   <h1>🔧 Update the robot</h1>
-  <a href="learn/">📚 Lessons</a>
-  <a href="./">🎮 Remote</a>
 </header>
 
 <p class="intro">Copies the newest robot code from this website onto the Alvik over a USB cable. Three steps.
@@ -497,5 +496,11 @@ update();
 loadSketches();
 loadCore();
 </script>
+<nav class="tabbar" aria-label="Pages">
+  <a href="./"><span>🕹️</span>Drive</a>
+  <a href="learn/"><span>📚</span>Lessons</a>
+  <a href="flash.html" aria-current="page"><span>🔧</span>Set up</a>
+  <a href="./#about"><span>❓</span>About</a>
+</nav>
 </body>
 </html>

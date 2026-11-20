@@ -13,8 +13,10 @@
 //   compassNews(head, heading, turn);           // on each packet
 //   compassStep(head, turn, dt);                // every frame; then draw head.shown
 
-export const SLOW_CM = 30, STOP_CM = 12;        // as on the robot: the bumper slows from 30 cm, stops at 12
-export const SEE_CM = 40;                       // the heat fades in from here
+import { SLOW_CM, BUMPER_CM as STOP_CM } from "./bumper.js";   // the robot's: slow from 14 cm, stop at 8
+export { SLOW_CM, STOP_CM };
+export const VIEW_CM = 30;                      // the picture's scale: this far away is at the edge of the view
+export const SEE_CM = 40;                       // the heat and the dots fade in from here
 export const ZONES = 5;                         // the distance sensor's zones, left to right
 const MID = [0, 1, 1, 1, 0];                    // the bumper only looks at the middle three
 const HEAT_RATE = 10, FADE_RATE = 7;            // per second: how fast the heat follows a reading, and fades in or out
@@ -78,7 +80,7 @@ export function easeHeat(heat, zones, dt) {
 /** The heat at one place across the front. u counts zones from the left: 0 is the middle of the left
  *  zone, 4 the middle of the right one, and the heat runs half a zone past each (-0.5 .. 4.5).
  *  Between two zones the distance and the colour are blended, and a zone that sees nothing fades
- *  away towards its neighbour. Yellow from 30 cm, warmer on the way in, and red from 12 cm (or when
+ *  away towards its neighbour. Yellow from SLOW_CM, warmer on the way in, and red from STOP_CM (or when
  *  the bumper has stopped the robot) but only where the bumper looks.
  *  -> { cm, alpha 0..1, rgb } */
 export function heatAt(heat, u, blocked = false) {
@@ -89,7 +91,7 @@ export function heatAt(heat, u, blocked = false) {
   const cm = (heat.cm[a] * wa + heat.cm[b] * wb) / shown;
   const mid = (MID[a] * wa + MID[b] * wb) / shown;
   const ends = clamp01((ZONES / 2 - Math.abs(u - (ZONES - 1) / 2)) * 2);       // soft at both ends
-  const near = clamp01((SEE_CM - cm) / (SEE_CM - SLOW_CM) + 0.15);            // faint at 40 cm, full from 30
+  const near = clamp01((SEE_CM - cm) / (SEE_CM - VIEW_CM) + 0.15);            // faint at 40 cm, full from 30
   const yellow = clamp01((SLOW_CM + 2 - cm) / 2);
   const warm = clamp01((SLOW_CM - cm) / (SLOW_CM - STOP_CM));
   const red = mid * (blocked ? 1 : clamp01((STOP_CM + 2 - cm) / 2));
@@ -117,7 +119,7 @@ export function cloudAdd(cloud, u, row, cm, at, up = 0) {
 export function cloudAlpha(point, now) {
   const age = (now - point.at) / CLOUD_MS;
   if (age < 0 || age >= 1) return 0;
-  return (1 - age) * clamp01((SEE_CM - point.cm) / (SEE_CM - SLOW_CM) + 0.15);
+  return (1 - age) * clamp01((SEE_CM - point.cm) / (SEE_CM - VIEW_CM) + 0.15);
 }
 
 // Picked up. The distance sensor's low zone looks down at the floor just ahead of the robot: 7.4 cm

@@ -91,12 +91,12 @@ test("the joystick drives it, gently, and it stops when the page goes quiet", ()
   assert.ok(r.got.T.at(-1).heading > 40 && r.view().angular === 90);
 });
 
-test("drives up to the box, slows, stops 12 cm short and flashes red; reversing is still allowed", () => {
+test("drives up to the box, slows, stops BUMPER_CM short and flashes red; reversing is still allowed", () => {
   const r = robot();
   r.driving(0, 100, 12000);
   const v = r.view(), gap = ROOM.boxes[0].y - (v.y + 4.8);
   assert.ok(v.blocked && v.linear === 0, "stopped by the bumper");
-  assert.ok(gap > 8 && gap < BUMPER_CM + 1.5, `stopped ${gap.toFixed(1)} cm from the box`);
+  assert.ok(gap > BUMPER_CM - 2 && gap < BUMPER_CM + 1.5, `stopped ${gap.toFixed(1)} cm from the box`);
   const t = r.got.T.at(-1);
   assert.ok(t.blocked && t.distance < BUMPER_CM + 1);
   assert.ok(r.got.T.some((p) => !p.blocked && p.distance !== null && p.distance < SLOW_CM && p.speed > 0 && p.speed < 8), "slowed on the way in");
@@ -124,11 +124,11 @@ test("bumper off: it drives into the box and stays outside it", () => {
   assert.equal(r.got.T.at(-1).bumper, false);
 });
 
-test("a chair leg slows it less than a wall would, and it gets far closer (lesson 6 says about 4 cm)", () => {
+test("a chair leg in one zone does not slow it; it only stops once two zones see the leg, very close", () => {
   const post = ROOM.posts[0];
   const r = robot({ ...ROOM, start: { x: post.x, y: post.y - 36 }, tape: [], mats: [] });
   r.driving(0, 100, 3500);                       // by now a wall would have had it crawling
-  assert.ok(r.view().linear > 4 && r.got.T.every((t) => !t.blocked && (t.distance === null || t.distance > 15)), "one zone only nudges the average");
+  assert.ok(r.view().linear > 4 && r.got.T.every((t) => !t.blocked && (t.distance === null || t.distance > 15)), "one zone alone is nothing");
   r.driving(0, 100, 8000);
   const gap = post.y - post.r - (r.view().y + 4.8);
   assert.ok(gap > 2 && gap < 6, `ends ${gap.toFixed(1)} cm from the leg`);

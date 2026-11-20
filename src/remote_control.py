@@ -28,16 +28,13 @@ ROBOT_NAME = "Alvik"
 SPEED = 8            # cm/s
 TURBO_SPEED = 13     # cm/s (about Alvik's top speed)
 TURN = 90            # deg/s
-BUMPER_CM = 12       # stop when something is closer than this in front
-SLOW_CM = 30         # start slowing down when something is closer than this
-FLOOR_CM = 17        # with nothing ahead the distance sensor sees the floor itself about this far away
-FLOOR_SLACK_CM = 4   # a reading this close to where the floor shows is taken for the floor
+BUMPER_CM = 8        # stop when something is closer than this in front
+SLOW_CM = 14         # start slowing down when something is closer than this. With nothing ahead the
+                     # distance sensor sees the floor (or the table) 16-18 cm away, so this stays under that
+FLOOR_SLACK_CM = 2   # once a zone has learnt where the floor shows, readings this close to it are floor too
 FLOOR_PROOF_CM = 4   # drive this far at a thing: if it came no closer, it was the floor all along
 CLOSER_CM = 1.5      # a reading has to drop by this much to count as "came closer" (less is noise)
-VIEW_JUMP_CM = 4     # a reading that changes by more than this at once is something else coming into view
-VIEW_TURN_DEG = 8    # and so is turning this far
-SURE = 4             # a thing has to show in this many readings in a row to count (fewer is a blip)
-BUMPER_SMOOTH = 0.3  # how much of the way the bumper's distance moves to the newest reading, each time round
+SURE = 5             # a thing has to show in this many readings in a row to count (about 0.15 s)
 ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
@@ -127,86 +124,60 @@ def bumper_limit(d, speed):
 
 
 class Zone:
-    """One zone of the distance sensor, telling real things from the floor.
+    """One zone of the distance sensor: is something really there, closer than SLOW_CM?
 
-    The sensor looks a little downwards, so with nothing ahead its front zones see the floor
-    itself: 16 to 18 cm on the real robot standing level (a wall behind that spot reflects more
-    and is seen instead). Taken as it comes, that reading would have the bumper slowing the robot
-    down on an empty floor. So a reading under SLOW_CM only counts as a real thing if:
-      - it is not where the floor shows in this zone (self.floor), or
-      - we have watched it come closer as the robot drove at it, without the view changing
-        (a wall the robot drives up to passes through where the floor shows and must stay a wall).
-    And a thing that comes no closer while the robot drives FLOOR_PROOF_CM at it was the floor
-    after all (a ramp, a carpet, a nose-up robot): from then on that is where the floor shows.
-    Closer than BUMPER_CM is always a real thing: the floor never looks that close.
-    The sensor also blips: a zone that mostly sees something far away drops to the floor's
-    reading for a moment. So a thing only counts once it has shown SURE times in a row."""
+    The sensor looks a little downwards, so with nothing ahead it sees the floor 16-18 cm away.
+    SLOW_CM is under that, so the floor is nothing. A reading only counts as a thing when:
+      - it is closer than SLOW_CM (and closer than a floor this zone has learnt, see below), and
+      - it shows SURE times in a row: the sensor blips, and a single blip is not a thing.
+    If the robot drives FLOOR_PROOF_CM at a thing and it comes no closer, it was the floor after
+    all (a nose-down robot, a bump in the table): from then on readings near it are floor too,
+    until the zone sees past SLOW_CM again."""
 
     def __init__(self):
-        self.floor = FLOOR_CM   # where the floor shows in this zone
-        self.last = None        # the reading before this one
+        self.floor = SLOW_CM    # readings from here out are nothing
         self.sure = 0           # readings in a row that showed a thing: it counts from SURE
-        self.real = False       # have we watched it come closer?
         self.mark = 0           # the thing's distance when it last came closer
         self.driven = 0         # cm driven at it since then
-        self.turned = 0         # degrees turned since we started looking at it
 
-    def see(self, d, moved=0, turned=0):
-        """d = the zone's reading in cm (None = nothing seen); moved = cm driven forward and
-        turned = degrees turned since the last reading. Returns the distance to a real thing, or
-        None for nothing or just the floor. Readings from SLOW_CM out are passed on as they are."""
-        last, self.last = self.last, d
+    def see(self, d, moved=0):
+        """d = the zone's reading in cm (None = nothing seen); moved = cm driven forward since the
+        last reading. Returns the distance to a real thing, or None."""
         if d is None or d >= SLOW_CM:
+            self.floor, self.sure = SLOW_CM, 0          # clear: forget any floor it learnt
+            return None
+        if d >= self.floor:
             self.sure = 0
-            return d
-        near_floor = d >= BUMPER_CM and abs(d - self.floor) <= FLOOR_SLACK_CM
-        if self.sure:
+            return None
+        if not self.sure or d < self.mark - CLOSER_CM:
+            self.mark, self.driven = d, 0               # new, or it came closer: watch it from here
+        else:
             self.driven += moved
-            self.turned += abs(turned)
-            if abs(d - last) > VIEW_JUMP_CM or self.turned > VIEW_TURN_DEG:
-                self.real, self.mark, self.driven, self.turned = False, d, 0, 0   # looking at something else now
-            elif d < self.mark - CLOSER_CM:
-                self.real = self.real or moved > 0                 # it comes closer as we drive: a real thing
-                self.mark, self.driven = d, 0
-            elif self.driven >= FLOOR_PROOF_CM and d >= BUMPER_CM:
-                self.floor, self.sure = d, 0                       # it does not: that is the floor here
-                return None
-            if d < BUMPER_CM:
-                self.real = True
-            if near_floor and not self.real:                       # a wobble in the floor's reading
+            if self.driven >= FLOOR_PROOF_CM and d >= BUMPER_CM:
+                self.floor = max(BUMPER_CM, self.mark - FLOOR_SLACK_CM)   # it came no closer: floor
                 self.sure = 0
                 return None
-        elif near_floor:
-            return None
-        else:
-            self.real, self.mark, self.driven, self.turned = d < BUMPER_CM, d, 0, 0
         if self.sure < SURE:
             self.sure += 1
         return d if self.sure >= SURE else None
 
 
 class Bumper:
-    """What is in the way, as one distance in cm.
+    """What is in the way, as one distance in cm: the middle of the middle three zones' answers.
 
-    It is the average of the middle three zones, not the closest of them: each zone has the floor
-    taken out (Zone) and counts as SLOW_CM when it is clear, and the average is smoothed over
-    about a tenth of a second. So one zone's odd reading, or something off to one side, only
-    nudges it, and a wall across all three counts in full. (Something narrow, like a chair leg,
-    fills one zone: the robot slows a little and bumps into it.)"""
+    So two zones out of three have to see a thing before the robot slows down. One zone's stray
+    reflection does nothing, and a wall or a box counts. (Something narrow, like a chair leg, fills
+    one zone only: the robot bumps into it.)"""
 
     def __init__(self):
         self.zones = [Zone(), Zone(), Zone()]
-        self.ahead = SLOW_CM
 
-    def look(self, distances, moved=0, turned=0):
-        """distances = the sensor's five readings, left to right; moved = cm driven forward and
-        turned = degrees turned since the last look. Returns cm to what is ahead, or None."""
-        total = 0
-        for zone, d in zip(self.zones, distances[1:4]):
-            d = zone.see(d, moved, turned)
-            total += SLOW_CM if d is None or d > SLOW_CM else d
-        self.ahead += (total / 3 - self.ahead) * BUMPER_SMOOTH
-        return self.ahead if self.ahead < SLOW_CM - 1 else None
+    def look(self, distances, moved=0):
+        """distances = the sensor's five readings, left to right; moved = cm driven forward since the
+        last look. Returns cm to what is ahead, or None."""
+        seen = [zone.see(d, moved) for zone, d in zip(self.zones, distances[1:4])]
+        near = sorted(d for d in seen if d is not None)
+        return near[1] if len(near) >= 2 else None
 
 
 def _int8(v, scale):
@@ -224,8 +195,8 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
     """What the robot is doing, for the 3D robot on the web remote (docs/telemetry.js reads it).
     10 bytes:  '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
       heading   int16, tenths of a degree, -1800..1799; turning left counts up
-      distance  cm to what the bumper sees in front (Bumper.look: an average, without the
-                floor), 0..254; 255 = nothing
+      distance  cm to what the bumper sees in front (Bumper.look: two zones out of three,
+                without the floor), 0..254; 255 = nothing
       lights    bit 0-2 = left LED red, green, blue; bit 3-5 = right LED
       speed     int8, 0.2 cm/s steps (forward is positive)
       turn      int8, 3 deg/s steps (left is positive)
@@ -430,9 +401,9 @@ def run_remote(alvik):
         if stick != (0, 0) and ticks_diff(now, stick_at) > STICK_TIMEOUT_MS:
             stick = (0, 0)                 # the page stopped talking: don't keep driving
 
-        # what is ahead (linear and angular are still what the wheels did since the last look)
+        # what is ahead (linear is still what the wheels did since the last look)
         seen = alvik.get_distance()
-        ahead = eyes.look(seen, linear * dt, angular * dt)
+        ahead = eyes.look(seen, linear * dt)
 
         # work out what's being asked for this tick
         move = dance.step() if dancing else None

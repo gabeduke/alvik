@@ -228,7 +228,7 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
       if ((stick[0] || stick[1]) && now - stickAt > STICK_TIMEOUT_MS) stick = [0, 0];   // the page went quiet
 
       seen = distances();
-      ahead = eyes.look(seen, linear * dt, angular * dt);
+      ahead = eyes.look(seen, linear * dt);
 
       const base = COLORS[colorI];
       const move = dance();

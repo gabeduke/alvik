@@ -19,7 +19,7 @@
 // Draws only when something changes, so an idle page costs nothing.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/loaders/GLTFLoader.js";
-import { SLOW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep,
+import { VIEW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep,
   newCloud, cloudAdd, cloudAlpha, ROW_BOTTOM, ROW_FRONT, ROW_TOP } from "./sensing.js";
 
 const WHEEL_R = 0.017, TRACK = 0.0895;          // metres: wheel radius, distance between the wheels
@@ -228,7 +228,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     for (let c = 0; c < HEAT_COLS; c++) {
       const u = -0.5 + c * ZONES / (HEAT_COLS - 1);
       const h = heatAt(heat, u, blocked);
-      const r = NOSE + 0.006 + gap * Math.min(h.cm, SLOW_CM) / SLOW_CM;
+      const r = NOSE + 0.006 + gap * Math.min(h.cm, VIEW_CM) / VIEW_CM;
       const a = THREE.MathUtils.degToRad(((ZONES - 1) / 2 - u) * ZONE_DEG);   // the robot's left is +X
       tint.setRGB(h.rgb[0], h.rgb[1], h.rgb[2], THREE.SRGBColorSpace);
       HEAT_ROWS.forEach((row, j) => {
@@ -247,7 +247,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     for (let i = 0; i < cloud.size; i++) {
       const p = cloud.points[i], alpha = p ? cloudAlpha(p, now) : 0;
       if (alpha) {
-        const r = NOSE + 0.006 + gap * Math.min(p.cm, SLOW_CM) / SLOW_CM;
+        const r = NOSE + 0.006 + gap * Math.min(p.cm, VIEW_CM) / VIEW_CM;
         const a = THREE.MathUtils.degToRad(((ZONES - 1) / 2 - p.u) * ZONE_DEG);
         cloudPos.setXYZ(i, Math.sin(a) * r, CLOUD_Y[p.row] + p.up, Math.cos(a) * r);
       }

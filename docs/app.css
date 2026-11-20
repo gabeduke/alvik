@@ -1,0 +1,24 @@
+/* The tab bar every page shares: Drive, Lessons, Set up, About. On the remote it is the last thing
+   in the page's column; on the long pages it stays at the bottom of the screen. */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; width: auto; max-width: none;
+  display: flex; justify-content: center; gap: 4px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: #2a2347; border-top: 1px solid rgba(255,255,255,.08);
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+}
+.tabbar a {
+  flex: 1; max-width: 150px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 5px 0; border-radius: 12px; text-decoration: none;
+  color: #b8b0d8; font-size: 12px; font-weight: 700; line-height: 1.1;
+}
+.tabbar a span { font-size: 22px; line-height: 1; }
+.tabbar a:hover { color: #fff; }
+.tabbar a[aria-current="page"] { color: #fff; background: rgba(63,169,245,.2); }
+body.tabbed { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+@media (max-height: 480px) {          /* a phone on its side: icons only */
+  .tabbar { padding-top: 3px; padding-bottom: calc(3px + env(safe-area-inset-bottom)); }
+  .tabbar a { flex-direction: row; justify-content: center; gap: 6px; font-size: 13px; }
+  .tabbar a span { font-size: 18px; }
+  body.tabbed { padding-bottom: calc(52px + env(safe-area-inset-bottom)); }
+}

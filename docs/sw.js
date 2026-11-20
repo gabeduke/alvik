@@ -11,7 +11,7 @@
 const BUILD = "__BUILD__";
 const CACHE = "alvik-" + BUILD;
 const SHELL = [
-  "./", "flash.html", "pwa.js", "flasher.js", "telemetry.js", "sensing.js", "twin.js", "models/alvik.glb",
+  "./", "app.css", "flash.html", "pwa.js", "flasher.js", "telemetry.js", "sensing.js", "twin.js", "models/alvik.glb",
   "pretend.js", "bumper.js", "playroom.js",
   "learn/", "learn/learn.css", "learn/1-wake-up.html", "learn/2-drive.html", "learn/3-smooth.html", "learn/4-talks-back.html",
   "learn/5-seeing.html", "learn/6-bumper.html", "learn/7-underneath.html", "learn/8-sketch.html", "learn/9-yours.html",

@@ -19,6 +19,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Alvik">
+<link rel="stylesheet" href="app.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <style>
   :root {
@@ -38,9 +39,10 @@
   header { width: 100%; max-width: 1000px; display: flex; align-items: center; gap: 12px; }
   h1 { margin: 0; font-size: 28px; flex: 1; white-space: nowrap; }
   #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  @media (max-width: 560px) { #statusText, #toolsText, #layout span, #title { display: none; } #layout button { font-size: 18px; padding: 5px 8px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
+  @media (max-width: 560px) { #statusText, #layout span, #title { display: none; } #layout button { font-size: 18px; padding: 5px 8px; } h1 { font-size: 24px; white-space: nowrap; } #connect { font-size: 18px; padding: 11px 14px; } }
   #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; }
   #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
+  body.demo #dot.on { background: var(--disco); box-shadow: 0 0 10px var(--disco); }
   #connect {
     font: inherit; font-size: 20px; font-weight: 700; border: 0; border-radius: 14px;
     padding: 12px 20px; background: var(--up); color: #fff; cursor: pointer;
@@ -52,7 +54,7 @@
     flex: 1; width: 100%; max-width: 1000px;
   }
   .stick {
-    --size: min(80vw, 42vh, 340px);
+    --size: min(72vw, 36vh, 320px);
     width: var(--size); height: var(--size); border-radius: 50%; position: relative;
     background: radial-gradient(circle, #3a3163 0%, var(--panel) 70%);
     box-shadow: inset 0 0 0 6px rgba(255,255,255,.08), 0 6px 0 rgba(0,0,0,.35);
@@ -169,16 +171,19 @@
     border: 0; border-radius: 9px; padding: 7px 10px; white-space: nowrap; cursor: pointer;
   }
   #layout button[aria-pressed="true"] { background: var(--up); color: #fff; }
-  footer { color: var(--muted); font-size: 14px; text-align: center; }
-  footer a, #lesson a { color: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; text-decoration: underline; }
-  /* new here: try a pretend robot, or read the lessons (gone once this device has met a real robot) */
-  #hello { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-  #hello[hidden], #lesson[hidden] { display: none; }
-  @media (max-width: 560px), (max-height: 480px) {      /* no room to spare: it floats over the joystick, which does nothing yet */
-    #hello { position: fixed; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 2; pointer-events: none; }
-    #hello > * { pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
-    #hello a { display: none; }
+  body > .tabbar { position: static; flex: none; width: calc(100% + 32px); margin: 0 -16px -16px; }
+  #lesson a { color: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; text-decoration: underline; }
+  /* not connected: how to get the robot ready (and, on a guest device, the pretend robot);
+     pretend robot on: a purple bar that says so, with its own way out */
+  #start, #demoBar {
+    width: 100%; max-width: 1000px; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; justify-content: center;
+    padding: 10px 14px; border-radius: 16px; background: var(--panel); color: var(--muted); font-size: 15px; line-height: 1.35; text-align: center;
   }
+  #start b { color: var(--text); }
+  #demoBar { background: var(--disco); color: #1b1630; justify-content: space-between; text-align: left; flex-wrap: nowrap; }
+  #demoBar .pill { background: rgba(27,22,48,.85); color: #fff; flex: none; }
+  #start[hidden], #demoBar[hidden], #tryDemo[hidden], #lesson[hidden] { display: none; }
+  @media (max-height: 480px) { #start > span, #demoBar > span { display: none; } #start, #demoBar { padding: 6px; } }
   .pill {
     font: inherit; font-size: 16px; font-weight: 700; text-decoration: none; color: var(--text); cursor: pointer;
     background: var(--panel); border: 0; border-radius: 12px; padding: 9px 14px; white-space: nowrap;
@@ -197,8 +202,7 @@
   }
   #twinHold[aria-pressed="true"] { background: var(--lights); }
   @media (max-height: 480px) { #twinMap { top: 8px; height: min(calc(100% - 42px), clamp(56px, 23vw, 136px)); } }
-  body.connected footer .how { display: none; }       /* how to get the robot ready: no use once it is */
-  body.connected:not(.demo) footer { display: none; } /* and no links to tap by mistake while a real robot is driving */
+  body.connected:not(.demo) .tabbar { display: none; } /* no links to tap by mistake while a real robot is driving */
   #about:not([open]) { display: none; }               /* for browsers that don't know <dialog> */
   #about .way[hidden] { display: none; }
   /* what this page is, for someone who has just found it */
@@ -237,14 +241,17 @@
     <button data-layout="stick" title="One joystick">🕹️<span> One hand</span></button>
     <button data-layout="two" title="Left thumb speed, right thumb steering">🙌<span> Two hands</span></button>
   </div>
-  <a id="tools" href="flash.html" title="Grown-ups: put new code on the robot over USB">🔧<span id="toolsText"> Update robot</span></a>
   <button id="connect">Connect</button>
 </header>
 
 <div id="msg"></div>
-<div id="hello" hidden>
-  <button class="pill go" id="tryDemo">🎮 No robot? Try a pretend one</button>
-  <a class="pill" href="learn/">📚 Lessons</a>
+<div id="start">
+  <span>On the robot: tap ⬆ until the lights are <b>purple</b>, then ✓. <b>Yellow</b> lights = ready: press <b>Connect</b>.</span>
+  <button class="pill go" id="tryDemo" hidden>🎮 No robot? Try a pretend one</button>
+</div>
+<div id="demoBar" hidden>
+  <span>🎮 <b>Pretend robot.</b> Drive it at the box, over the black tape and onto the colours.</span>
+  <button class="pill" id="demoStop">✕ Stop</button>
 </div>
 <div id="lesson" hidden>📚 Lesson view: some of the sensors are switched off. <a id="lessonAll">Show them all</a></div>
 
@@ -278,8 +285,12 @@
   </div>
 </main>
 
-<footer><span class="how">On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</span>
-  <a id="aboutLink" href="#about">❓ What is this?</a> <a href="learn/">📚 Lessons</a></footer>
+<nav class="tabbar" aria-label="Pages">
+  <a href="./" aria-current="page"><span>🕹️</span>Drive</a>
+  <a href="learn/"><span>📚</span>Lessons</a>
+  <a href="flash.html"><span>🔧</span>Set up</a>
+  <a href="#about" id="aboutLink"><span>❓</span>About</a>
+</nav>
 
 <dialog id="about" aria-labelledby="aboutTitle">
   <h2 id="aboutTitle">👋 A remote control for the Arduino Alvik robot</h2>
@@ -469,11 +480,13 @@ function setConnected(on) {
   $("dot").classList.toggle("on", on);
   document.body.classList.toggle("connected", on);
   $("statusText").textContent = on ? (demo ? "Pretend robot" : "Connected") : "Not connected";
-  $("connect").textContent = on ? (demo ? "Stop" : "Disconnect") : "Connect";
-  $("connect").classList.toggle("connected", on);
-  $("connect").disabled = !on && !navigator.bluetooth;
+  $("connect").textContent = on && !demo ? "Disconnect" : "Connect";       // with the pretend robot on: connect a real one instead
+  $("connect").classList.toggle("connected", on && !demo);
+  $("connect").disabled = !navigator.bluetooth;
   document.body.classList.toggle("demo", on && !!demo);
-  $("hello").hidden = on || !guest;
+  $("start").hidden = on;
+  $("tryDemo").hidden = !guest;
+  $("demoBar").hidden = !(on && demo);
   allButtons.forEach((b) => (b.disabled = !on));
   controls.forEach((c) => c.classList.toggle("disabled", !on));
   sent = [0, 0]; stickBusy = false;      // a robot we just met is standing still
@@ -546,7 +559,7 @@ async function listen(service) {
     await tx.startNotifications();
     await write(telemetryRequest(true));
     setTimeout(() => {
-      if (rx && !heard) $("msg").textContent = "The 3D robot needs new robot code. Tap 🔧 to update the robot.";
+      if (rx && !heard) $("msg").textContent = "The 3D robot needs new robot code: disconnect, then 🔧 Set up.";
     }, 3000);
   } catch (e) {
     console.warn("no telemetry", e);
@@ -568,7 +581,7 @@ async function startDemo() {
     demo = openPlayroom({ canvas: $("twinMap"), onData: feed });
     rx = { writeValueWithoutResponse: async (data) => demo?.write(data) };
     setConnected(true);
-    $("msg").textContent = layers ? "" : "🎮 A pretend robot in a pretend room. Drive it at the box, over the black tape and onto the colours.";
+    $("msg").textContent = "";
     write(telemetryRequest(true));
   } catch (e) {
     console.warn("no pretend robot", e);
@@ -588,11 +601,11 @@ function stopDemo() {
 }
 
 async function connect() {
-  if (demo) { stopDemo(); return; }
+  if (demo) stopDemo();                 // a real robot takes over from the pretend one
   if (device?.gatt?.connected) { device.gatt.disconnect(); return; }
   if (connecting) return;
   connecting = true;
-  $("hello").hidden = true;
+  $("tryDemo").hidden = true;
   try {
     $("msg").textContent = "";
     device = await navigator.bluetooth.requestDevice({
@@ -725,12 +738,13 @@ about.addEventListener("click", (e) => {                 // a tap outside it (on
   if (e.target === about && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) about.close();
 });
 $("tryDemo").addEventListener("click", startDemo);
+$("demoStop").addEventListener("click", () => { if (demo) stopDemo(); });
 if (layers) {
   $("lesson").hidden = false;
   $("lessonAll").href = asked.has("demo") ? "./?demo" : "./";
 }
 if (asked.has("demo")) startDemo();
-else if (newHere && !layers && !matchMedia("(display-mode: standalone)").matches) openAbout();
+else if (location.hash === "#about" || (newHere && !layers && !matchMedia("(display-mode: standalone)").matches)) openAbout();
 
 // Installable app + self-updating (pwa.js). Never reload while connected: that drops Bluetooth
 // and the robot brakes, so the reload waits until it disconnects.

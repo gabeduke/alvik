@@ -5,96 +5,78 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1b1630">
 <title>🔧 Wake up the robot · Alvik lessons</title>
-<meta name="description" content="Lesson 1: Put the code on your Alvik from the browser and meet its colour menu.">
+<meta name="description" content="Lesson 1: Put the code on your Alvik from the browser and meet the colour menu.">
 <meta property="og:title" content="🔧 Wake up the robot · Alvik lessons">
-<meta property="og:description" content="Lesson 1: Put the code on your Alvik from the browser and meet its colour menu.">
+<meta property="og:description" content="Lesson 1: Put the code on your Alvik from the browser and meet the colour menu.">
 <meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="learn.css">
+<link rel="stylesheet" href="../app.css">
 </head>
-<body>
-<header class="top">
-  <a class="home" href="./">📚 Alvik lessons</a>
-  <a class="chip" href="../?demo">🎮 Pretend robot</a>
-  <a class="chip" href="../">🤖 Remote</a>
-</header>
+<body class="tabbed">
+<header class="top"><a class="home" href="./">📚 Alvik lessons</a></header>
 
 <p class="kicker">Lesson 1 of 9 · about 15 minutes</p>
 <h1>🔧 Wake up the robot</h1>
-<p class="lead">Put this project's code on your Alvik, straight from the browser. Then meet the
-  <b>colour menu</b>: the robot's lights show which program you are about to run.</p>
+<p class="lead">Put this project's code on your Alvik from the browser, then meet the <b>colour menu</b>.</p>
 
 <section class="need">
   <h2>🧰 You need</h2>
   <ul>
     <li>Your Alvik, charged and switched on.</li>
-    <li>A USB-C cable. It has to carry data: some cables only charge.</li>
-    <li>A computer with <b>Chrome</b> or <b>Edge</b> (Mac, Windows, Linux or Chromebook). Phones and tablets can't do this step.</li>
+    <li>A USB-C cable that carries data (some only charge).</li>
+    <li>A computer with <b>Chrome</b> or <b>Edge</b>. Phones can't do this step.</li>
   </ul>
-  <p class="note"><b>This replaces the robot's own menu program</b> with this project's. The three
-    programs your Alvik came with (touch-move, line follower, hand follower) are still in it, and the
-    Alvik library on the robot is not touched. To go back to Arduino's own, copy the files from
-    <a href="https://github.com/arduino/arduino-alvik-mpy/tree/main/examples/demo"><code>examples/demo</code> in arduino-alvik-mpy</a> onto the robot.</p>
+  <p class="note">This replaces the robot's menu program. Its three built-in programs stay. To go back, copy
+    <a href="https://github.com/arduino/arduino-alvik-mpy/tree/main/examples/demo"><code>examples/demo</code></a> onto the robot.</p>
 </section>
 
 <section>
   <h2>▶️ Do it</h2>
   <ol class="steps">
-    <li>Close <b>Arduino Lab for MicroPython</b> if it is open. Only one program can use the USB cable at a time.</li>
-    <li>Open the <a href="../flash.html">🔧 Update the robot</a> page on the computer.</li>
-    <li>Plug the robot in and switch it on. Press <b>🔌 Connect USB</b> and pick the robot in the list.</li>
-    <li>Under <b>✨ Extras</b>, tap <b>＋ Add</b> on any you like. Each one becomes a new colour in the robot's menu.</li>
-    <li>Press <b>⚡ Update the robot</b> and wait. Each file is copied, then checked. The robot restarts by itself.</li>
-    <li>The lights go <b>blue</b>. That is the menu. Unplug the cable and put the robot on the floor.</li>
+    <li>Close <b>Arduino Lab for MicroPython</b> if it is open.</li>
+    <li>Open <a href="../flash.html">🔧 Update the robot</a>.</li>
+    <li>Plug in the robot, press <b>🔌 Connect USB</b> and pick it.</li>
+    <li>Optional: under <b>✨ Extras</b>, tap <b>＋ Add</b> on any you like.</li>
+    <li>Press <b>⚡ Update the robot</b>. It restarts by itself.</li>
+    <li>Lights go <b>blue</b>: that is the menu. Unplug it.</li>
   </ol>
 </section>
 
 <section>
   <h2>🚦 The colour menu</h2>
-  <p>On top of the robot are touch buttons. <kbd>⬆</kbd> and <kbd>⬇</kbd> change the colour, <kbd>✓</kbd> runs
-    that program, and <kbd>✗</kbd> comes back to the menu.</p>
+  <p><kbd>⬆</kbd> <kbd>⬇</kbd> change colour, <kbd>✓</kbd> runs it, <kbd>✗</kbd> goes back.</p>
   <div class="scroll"><table>
     <tr><th>Lights</th><th>Program</th><th>What it does</th></tr>
-    <tr><td>🔴 red</td><td>Touch-move</td><td>Tap the arrows to line up moves, then ✓ to run them.</td></tr>
-    <tr><td>🔵 blue</td><td>Line follower</td><td>Follows a black line on a pale floor. The menu starts here.</td></tr>
-    <tr><td>🟢 green</td><td>Hand follower</td><td>Keeps about 10 cm from your hand: forwards and backwards.</td></tr>
-    <tr><td>🟣 purple</td><td>Remote</td><td>Waits for a phone or laptop to drive it. That is lesson 2.</td></tr>
-    <tr><td>⚪ white, 🟡 yellow…</td><td>Your extras</td><td>One colour each, after purple: white is Disco, yellow is Follow me.</td></tr>
+    <tr><td>🔴 red</td><td>Touch-move</td><td>Tap arrows to line up moves, ✓ to run them.</td></tr>
+    <tr><td>🔵 blue</td><td>Line follower</td><td>Follows a black line. The menu starts here.</td></tr>
+    <tr><td>🟢 green</td><td>Hand follower</td><td>Keeps about 10 cm from your hand.</td></tr>
+    <tr><td>🟣 purple</td><td>Remote</td><td>Drive it from a phone (lesson 2).</td></tr>
+    <tr><td>⚪ white, 🟡 yellow…</td><td>Your extras</td><td>One colour each.</td></tr>
   </table></div>
-  <p class="muted small">More than six programs? They come in pages of six. On the second page the light
-    blinks off once every two seconds, on the third page twice.</p>
+  <p class="muted small">Programs come in pages of six. On page 2 the light blinks once every two seconds, on page 3 twice.</p>
 </section>
 
 <section>
   <h2>🔍 How it works</h2>
-  <p>The Alvik has a small computer that runs <b>MicroPython</b>: Python for tiny computers. Its
-    programs are ordinary <code>.py</code> files stored on the robot. When you switch it on it runs the
-    file called <code>main.py</code>, and ours is one line long:</p>
-  <pre><code>import demo</code></pre>
-  <p><a href="https://github.com/gabeduke/alvik/blob/main/src/demo.py"><code>demo.py</code></a> is the
-    colour menu. It is a list of colours and programs, and a loop that watches the touch buttons:</p>
+  <p>The robot runs <b>MicroPython</b>. At power-on it runs <code>main.py</code>, which is just
+    <code>import demo</code>. <a href="https://github.com/gabeduke/alvik/blob/main/src/demo.py"><code>demo.py</code></a>
+    is the menu: a list of colours and programs.</p>
   <pre><code>MENU = [            <span class="c"># (colour, program)</span>
     (RED, run_touch_move),
     ((0, 0, 1), run_line_follower),
     ((0, 1, 0), run_hand_follower),
     ((1, 0, 1), run_remote),
 ]</code></pre>
-  <p>A colour is three numbers: how much red, green and blue. <code>(1, 0, 1)</code> is red and blue
-    together, which makes purple.</p>
-  <p>The update page talks to the robot down the USB cable. It does what a person would do at the
-    robot's Python prompt, only faster: it stops whatever is running, sends each file, asks the robot
-    to work out a fingerprint of what it saved (a <b>checksum</b>), compares that with the fingerprint
-    of the file it sent, and restarts the robot. If one letter got lost on the way, the fingerprints
-    would not match.</p>
+  <p>A colour is (red, green, blue). <code>(1, 0, 1)</code> is purple. The update page sends each file
+    down the cable and checks a <b>checksum</b> so nothing gets lost.</p>
 </section>
 
 <section class="try">
   <h2>🧪 Try this</h2>
   <ul>
-    <li><b>Program a square.</b> Go to red, press ✓, then tap ⬆ ➡ ⬆ ➡ ⬆ ➡ ⬆ ➡ and press ✓. Does it end where it started? Why not quite?</li>
-    <li><b>Make a track.</b> Stick black tape on a pale floor, or draw a thick black line on paper. Blue, ✓, and put the robot on the line.</li>
-    <li><b>Look at the log.</b> On the update page, open <b>Log</b> at the bottom and update the robot again. You can read every message that goes down the cable.</li>
-    <li><b>Count the colours.</b> How many different colours can two lights make if each of red, green and blue is only on or off? (One of them is "off".)</li>
+    <li><b>Program a square.</b> Red, ✓, then ⬆ ➡ ⬆ ➡ ⬆ ➡ ⬆ ➡ and ✓. Does it end where it started?</li>
+    <li><b>Make a track.</b> Black tape on a pale floor. Blue, ✓, robot on the line.</li>
   </ul>
 </section>
 
@@ -105,5 +87,11 @@
 
 <footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
   Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+<nav class="tabbar" aria-label="Pages">
+  <a href="../"><span>🕹️</span>Drive</a>
+  <a href="./" aria-current="page"><span>📚</span>Lessons</a>
+  <a href="../flash.html"><span>🔧</span>Set up</a>
+  <a href="../#about"><span>❓</span>About</a>
+</nav>
 </body>
 </html>

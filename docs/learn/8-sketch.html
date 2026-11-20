@@ -5,40 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1b1630">
 <title>🙀 Teach it a trick · Alvik lessons</title>
-<meta name="description" content="Lesson 8: Write a small program of your own and put it in the robot's menu.">
+<meta name="description" content="Lesson 8: Write your own program for the robot's menu.">
 <meta property="og:title" content="🙀 Teach it a trick · Alvik lessons">
-<meta property="og:description" content="Lesson 8: Write a small program of your own and put it in the robot's menu.">
+<meta property="og:description" content="Lesson 8: Write your own program for the robot's menu.">
 <meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="learn.css">
+<link rel="stylesheet" href="../app.css">
 </head>
-<body>
-<header class="top">
-  <a class="home" href="./">📚 Alvik lessons</a>
-  <a class="chip" href="../?demo">🎮 Pretend robot</a>
-  <a class="chip" href="../">🤖 Remote</a>
-</header>
+<body class="tabbed">
+<header class="top"><a class="home" href="./">📚 Alvik lessons</a></header>
 
 <p class="kicker">Lesson 8 of 9 · about 30 minutes</p>
 <h1>🙀 Teach it a trick</h1>
-<p class="lead">Time to write a program of your own. A <b>sketch</b> is a small program that shows up
-  as a new colour in the robot's menu. You will read one, then write one: a <b>scaredy cat</b> that
-  backs away when something comes close.</p>
+<p class="lead">A <b>sketch</b> is a small program that becomes a new colour in the robot's menu.
+  Read one, then write a <b>scaredy cat</b> that backs away when something comes close.</p>
 
 <section class="need">
   <h2>🧰 You need</h2>
   <ul>
     <li>The robot, a USB-C cable and the computer from lesson 1.</li>
-    <li>Something to type code in. <b>Arduino Lab for MicroPython</b> is enough.</li>
+    <li><b>Arduino Lab for MicroPython</b>.</li>
   </ul>
 </section>
 
 <section>
   <h2>▶️ Read one first</h2>
   <ol class="steps">
-    <li>On the <a href="../flash.html">🔧 Update the robot</a> page, add <b>🐕 Follow me</b> and update the robot.</li>
-    <li>On the robot, tap <kbd>⬆</kbd> until the lights are <b>yellow</b>, then <kbd>✓</kbd>. Hold your hand in front of it and walk it around like a puppy.</li>
-    <li>Now read it. The whole program is one function:</li>
+    <li>On the <a href="../flash.html">🔧 Update the robot</a> page, add <b>🐕 Follow me</b> and update.</li>
+    <li>Pick <b>yellow</b>, press <kbd>✓</kbd>, and lead it with your hand.</li>
+    <li>Here is the whole program:</li>
   </ol>
   <pre><code>def run(alvik):
     readings = alvik.get_distance()                  <span class="c"># cm, or None if a sensor has no reading yet</span>
@@ -57,33 +53,21 @@
 
     sleep_ms(50)
     return 1</code></pre>
-  <p>Find the closest of the five readings. If it is on the left, turn left. If it is further than
-    the puppy likes, drive forward; if it is nearer, back up. That is all a puppy needs.</p>
-  <p><code>alvik.drive(speed, turn)</code> is the one command for moving: a speed in cm/s (negative
-    is backwards) and a turn in degrees per second (positive is left).</p>
+  <p>Find the closest reading, turn toward it, and drive forward or back to keep a set distance.
+    <code>alvik.drive(speed, turn)</code> takes cm/s (negative = backwards) and degrees per second (positive = left).</p>
 </section>
 
 <section>
   <h2>🔍 How a sketch works</h2>
-  <p>A sketch is a folder with three files in it:</p>
-  <div class="scroll"><table>
-    <tr><th>File</th><th>What it is</th></tr>
-    <tr><td><code>scaredy_cat.py</code></td><td>The program. It must have a function called <code>run(alvik)</code>.</td></tr>
-    <tr><td><code>sketch.json</code></td><td>A label: its name, an emoji, a line about it, and the colour of its menu light.</td></tr>
-    <tr><td><code>README.md</code></td><td>A note for people: what it does, its lights and buttons.</td></tr>
-  </table></div>
-  <p>The menu calls <code>run(alvik)</code> <b>again and again</b>, many times a second, until
-    someone presses ✗. So <code>run</code> does one small step each time: look, decide, move, done.
-    Don't write a loop that goes on for ever inside it, or ✗ will stop working.</p>
-  <p>When the robot starts, it looks in its <code>/sketches</code> folder, reads each
-    <code>sketch.json</code>, and adds a colour to the menu for each one. If your program crashes,
-    the lights flash red three times and the menu comes back. Nothing breaks.</p>
+  <p>A sketch is a folder with a program (<code>scaredy_cat.py</code>, with a <code>run(alvik)</code>
+    function), a label (<code>sketch.json</code>) and a <code>README.md</code>.</p>
+  <p>The menu calls <code>run(alvik)</code> over and over until ✗. So do one small step each time;
+    never loop forever inside it. If it crashes, the lights flash red and the menu comes back.</p>
 </section>
 
 <section>
   <h2>✍️ Write the scaredy cat</h2>
-  <p>Make a folder called <code>scaredy_cat</code> and type these two files into it. Typing it
-    yourself is slower than copying, and you will understand it better.</p>
+  <p>Make a folder <code>scaredy_cat</code> with these two files.</p>
   <p><b><code>scaredy_cat.py</code></b></p>
   <pre><code>from time import sleep_ms
 
@@ -117,45 +101,35 @@ def run(alvik):
   "hardware": ["distance sensors", "wheels", "lights"],
   "entry": "scaredy_cat"
 }</code></pre>
-  <p><code>"color": [0, 1, 1]</code> is green and blue together: cyan. <code>"entry"</code> is the
-    name of your <code>.py</code> file, without the <code>.py</code>.</p>
+  <p><code>[0, 1, 1]</code> is cyan. <code>"entry"</code> is the <code>.py</code> file's name.</p>
 
   <h3>Put it on the robot</h3>
-  <p>The folder has to end up on the robot as <code>/sketches/scaredy_cat/</code>. Three ways, easiest first:</p>
+  <p>It must end up at <code>/sketches/scaredy_cat/</code> on the robot:</p>
   <ul>
-    <li><b>Just to see it:</b> the finished one is already in the extras on the
-      <a href="../flash.html">update page</a> as 🙀 Scaredy cat.</li>
-    <li><b>Arduino Lab for MicroPython:</b> connect, open the robot's files, make a folder
-      <code>scaredy_cat</code> inside <code>sketches</code> (make <code>sketches</code> too if it
-      isn't there), and save your two files into it. Switch the robot off and on.</li>
-    <li><b>A terminal</b>, with <a href="https://docs.micropython.org/en/latest/reference/mpremote.html">mpremote</a> installed:
+    <li><b>Easiest:</b> add 🙀 Scaredy cat on the <a href="../flash.html">update page</a>.</li>
+    <li><b>Arduino Lab:</b> make <code>sketches/scaredy_cat</code> on the robot, save both files there, restart.</li>
+    <li><b>Terminal</b> (<a href="https://docs.micropython.org/en/latest/reference/mpremote.html">mpremote</a>):
       <pre><code>mpremote fs mkdir :sketches
-mpremote fs cp -r scaredy_cat :sketches/ + reset</code></pre>
-      (The first line complains if the folder is already there. That is fine.)</li>
+mpremote fs cp -r scaredy_cat :sketches/ + reset</code></pre></li>
   </ul>
-  <p>Then on the robot: <kbd>⬆</kbd> until the lights are <b>cyan</b>, and <kbd>✓</kbd>. Green means calm. Bring your hand to its nose.</p>
+  <p>Then pick <b>cyan</b>, <kbd>✓</kbd>, and bring your hand to its nose.</p>
 </section>
 
 <section class="try">
   <h2>🧪 Try this</h2>
   <ul>
-    <li><b>Break it on purpose.</b> Change <code>TOO_CLOSE_CM</code> to 20 and put the robot on an empty floor. What does it do, and why? (Lesson 5 has the answer.)</li>
-    <li><b>Turn tail.</b> Make it spin away instead of backing up: <code>alvik.drive(0, 90)</code>.</li>
-    <li><b>Look both ways.</b> <code>alvik.get_distance()</code> gives five numbers. Use the left and right ones to turn away from the side the scary thing is on.</li>
-    <li><b>A brave cat.</b> Make one that creeps towards things instead, and stops just in time.</li>
-    <li><b>Crash it.</b> Spell <code>brake</code> wrong and run it. Count the red flashes. The robot also prints which line went wrong down the USB cable: the <a href="https://github.com/gabeduke/alvik#menu-colors">README</a> says how to read it.</li>
+    <li><b>Break it.</b> Set <code>TOO_CLOSE_CM</code> to 20 on an empty floor. Why does it back away? (Lesson 5.)</li>
+    <li><b>Turn tail.</b> Spin away instead: <code>alvik.drive(0, 90)</code>.</li>
+    <li><b>Look both ways.</b> Use the left and right readings to turn away from the scary side.</li>
   </ul>
 </section>
 
 <section class="change">
   <h2>✏️ Make your own</h2>
-  <p>Now invent one. A robot that turns to face the brightest colour? One that draws a square, or
-    refuses to cross a black line? The Alvik commands used in this project are a good start:
-    <code>drive</code>, <code>brake</code>, <code>get_distance</code>, <code>get_line_sensors</code>,
-    <code>get_color</code>, <code>left_led.set_color</code>, and <code>get_touch_ok</code> for the ✓ button.
-    The full list is in <a href="https://docs.arduino.cc/tutorials/alvik/api-overview/">Arduino's Alvik guide</a>.</p>
-  <p>The rules for a sketch that other people can install from the update page are in the
-    <a href="https://github.com/gabeduke/alvik#sketches">README</a>.</p>
+  <p>Useful commands: <code>drive</code>, <code>brake</code>, <code>get_distance</code>,
+    <code>get_line_sensors</code>, <code>get_color</code>, <code>left_led.set_color</code>,
+    <code>get_touch_ok</code>. Full list: <a href="https://docs.arduino.cc/tutorials/alvik/api-overview/">Arduino's Alvik guide</a>.
+    Sharing rules: the <a href="https://github.com/gabeduke/alvik#sketches">README</a>.</p>
 </section>
 
 <nav class="next">
@@ -165,5 +139,11 @@ mpremote fs cp -r scaredy_cat :sketches/ + reset</code></pre>
 
 <footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
   Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+<nav class="tabbar" aria-label="Pages">
+  <a href="../"><span>🕹️</span>Drive</a>
+  <a href="./" aria-current="page"><span>📚</span>Lessons</a>
+  <a href="../flash.html"><span>🔧</span>Set up</a>
+  <a href="../#about"><span>❓</span>About</a>
+</nav>
 </body>
 </html>

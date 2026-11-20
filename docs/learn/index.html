@@ -5,70 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1b1630">
 <title>Alvik lessons: drive a robot, then see what it senses</title>
-<meta name="description" content="Nine short lessons with the Arduino Alvik robot: flash it from the browser, drive it over Bluetooth, then watch its sensors come online on a live 3D robot. Works with a pretend robot too.">
+<meta name="description" content="Nine short lessons with the Arduino Alvik robot: put the code on it, drive it over Bluetooth, and watch its sensors on a live 3D robot. Works with a pretend robot too.">
 <meta property="og:title" content="Alvik lessons: drive a robot, then see what it senses">
-<meta property="og:description" content="Nine short lessons with the Arduino Alvik robot: flash it from the browser, drive it over Bluetooth, then watch its sensors come online on a live 3D robot. Works with a pretend robot too.">
+<meta property="og:description" content="Nine short lessons with the Arduino Alvik robot: put the code on it, drive it over Bluetooth, and watch its sensors on a live 3D robot. Works with a pretend robot too.">
 <meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="learn.css">
+<link rel="stylesheet" href="../app.css">
 </head>
-<body>
-<header class="top">
-  <a class="home" href="./">📚 Alvik lessons</a>
-  <a class="chip" href="../?demo">🎮 Pretend robot</a>
-  <a class="chip" href="../">🤖 Remote</a>
-</header>
+<body class="tabbed">
+<header class="top"><a class="home" href="./">📚 Alvik lessons</a></header>
 <h1>Drive a robot, then see what it senses</h1>
-<p class="lead">Nine short lessons with the <b>Arduino Alvik</b> robot. You start with a robot that does
-  nothing new and end with one you drive from a web page, while a live 3D robot on the screen shows
-  what its sensors see. One sensor comes online in each lesson, the way it did when we built it.</p>
+<p class="lead">Nine short lessons with the <b>Arduino Alvik</b>. Drive it from a web page, and add
+  one sensor per lesson to a live 3D robot on the screen.</p>
 
 <section class="see">
   <h2>🎮 No robot? Start anyway</h2>
-  <p>Every lesson from 2 to 7 also works with a <b>pretend robot</b> that lives in the web page. It takes
-    the same messages as the real one and sends the same answers back, so nothing in the lessons changes.</p>
+  <p>Lessons 2 to 7 also work with a <b>pretend robot</b> in the web page.</p>
   <a class="go" href="../?demo">🎮 Drive the pretend robot</a>
 </section>
 
 <ol class="lessons">
-  <li><a href="1-wake-up.html"><span class="emoji">🔧</span><b><small>1</small>Wake up the robot</b><span class="what">Put the code on your Alvik from the browser and meet its colour menu.</span></a></li>
-  <li><a href="2-drive.html"><span class="emoji">🕹️</span><b><small>2</small>Drive it</b><span class="what">Connect over Bluetooth and drive. Every push of the joystick is five bytes.</span></a></li>
-  <li><a href="3-smooth.html"><span class="emoji">🚀</span><b><small>3</small>Smooth moves</b><span class="what">Why the robot speeds up gently, and what stops it if the remote goes quiet.</span></a></li>
-  <li><a href="4-talks-back.html"><span class="emoji">📡</span><b><small>4</small>The robot talks back<span class="new">✨ 3D robot: turning, wheels, lights</span></b><span class="what">The robot starts sending news, and a 3D robot on the screen copies it.</span></a></li>
-  <li><a href="5-seeing.html"><span class="emoji">👀</span><b><small>5</small>Seeing ahead<span class="new">✨ 3D robot: the cloud of dots</span></b><span class="what">The distance sensor comes online as a cloud of dots. It sees more than you'd think, and it is wrong a lot.</span></a></li>
-  <li><a href="6-bumper.html"><span class="emoji">🛡️</span><b><small>6</small>The bumper<span class="new">✨ 3D robot: the heat</span></b><span class="what">From noisy readings to one decision: slow down, or stop.</span></a></li>
-  <li><a href="7-underneath.html"><span class="emoji">🌈</span><b><small>7</small>Underneath<span class="new">✨ 3D robot: floor, lines, lift, lean</span></b><span class="what">The floor's colour, black lines, being picked up and tipped over.</span></a></li>
-  <li><a href="8-sketch.html"><span class="emoji">🙀</span><b><small>8</small>Teach it a trick</b><span class="what">Write a small program of your own and put it in the robot's menu.</span></a></li>
-  <li><a href="9-yours.html"><span class="emoji">🛠️</span><b><small>9</small>Make it yours</b><span class="what">Your own copy of the whole thing: the website, the 3D model, a new sensor.</span></a></li>
+  <li><a href="1-wake-up.html"><span class="emoji">🔧</span><b><small>1</small>Wake up the robot</b><span class="what">Put the code on it and meet the colour menu.</span></a></li>
+  <li><a href="2-drive.html"><span class="emoji">🕹️</span><b><small>2</small>Drive it</b><span class="what">Drive over Bluetooth, five bytes at a time.</span></a></li>
+  <li><a href="3-smooth.html"><span class="emoji">🚀</span><b><small>3</small>Smooth moves</b><span class="what">Gentle speed-ups, and stopping when the remote goes quiet.</span></a></li>
+  <li><a href="4-talks-back.html"><span class="emoji">📡</span><b><small>4</small>The robot talks back<span class="new">✨ 3D robot: turning, wheels, lights</span></b><span class="what">The robot sends news; the 3D robot copies it.</span></a></li>
+  <li><a href="5-seeing.html"><span class="emoji">👀</span><b><small>5</small>Seeing ahead<span class="new">✨ 3D robot: the cloud of dots</span></b><span class="what">The distance sensor, and why it is often wrong.</span></a></li>
+  <li><a href="6-bumper.html"><span class="emoji">🛡️</span><b><small>6</small>The bumper<span class="new">✨ 3D robot: the heat</span></b><span class="what">Noisy readings to one decision: slow down, or stop.</span></a></li>
+  <li><a href="7-underneath.html"><span class="emoji">🌈</span><b><small>7</small>Underneath<span class="new">✨ 3D robot: floor, lines, lift, lean</span></b><span class="what">Floor colour, black lines, picked up, tipped over.</span></a></li>
+  <li><a href="8-sketch.html"><span class="emoji">🙀</span><b><small>8</small>Teach it a trick</b><span class="what">Write your own program for the menu.</span></a></li>
+  <li><a href="9-yours.html"><span class="emoji">🛠️</span><b><small>9</small>Make it yours</b><span class="what">Your own copy of the whole project.</span></a></li>
 </ol>
 
 <section>
   <h2>🧭 How the lessons work</h2>
-  <p>Each one is for a single sitting, and each has the same parts:</p>
-  <ul>
-    <li><b>▶️ Do it</b>: steps to follow, with the robot on the floor.</li>
-    <li><b>🔍 How it works</b>: what is going on inside, with the real code.</li>
-    <li><b>🧪 Try this</b>: small experiments. Guess what will happen first, then look.</li>
-    <li><b>✏️ Change it</b>: one thing to change in the code, for when you want to go further.</li>
-  </ul>
-  <p>They were written by a family, for a grown-up and a child to do together (ours started at about
-    eight). You can also just read them to see how the remote works. Lessons 1 to 7 need nothing but
-    a browser. Their optional "peek with code" boxes, and lesson 8, use Arduino Lab for MicroPython,
-    the free editor from Arduino that most Alvik owners already have.</p>
+  <p>Each lesson has <b>▶️ Do it</b> (steps), <b>🔍 How it works</b> (the real code), <b>🧪 Try this</b>
+    and <b>✏️ Change it</b>. Made for a grown-up and a child together.</p>
 </section>
 
 <section class="need">
   <h2>🧰 What you need</h2>
   <ul>
-    <li>An <a href="https://docs.arduino.cc/hardware/alvik/">Arduino Alvik</a>, charged, running MicroPython as it comes out of the box.</li>
-    <li>A USB-C cable and a computer with <b>Chrome</b> or <b>Edge</b>, to put the code on the robot (lesson 1).</li>
-    <li>Something to drive with: an Android phone or tablet, a Chromebook, or a Mac or Windows laptop, with Chrome or Edge.
-      On an iPad or iPhone, the free <b>Bluefy</b> browser.</li>
-    <li>For later lessons: a clear bit of floor, a box, a few sheets of coloured paper and some black tape.</li>
+    <li>An <a href="https://docs.arduino.cc/hardware/alvik/">Arduino Alvik</a>, charged, and a USB-C cable.</li>
+    <li><b>Chrome</b> or <b>Edge</b> on a computer, phone or tablet. On iPad or iPhone, the free <b>Bluefy</b> browser.</li>
+    <li>Later: some floor, a box, coloured paper and black tape.</li>
   </ul>
 </section>
 
 <footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
   Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+<nav class="tabbar" aria-label="Pages">
+  <a href="../"><span>🕹️</span>Drive</a>
+  <a href="./" aria-current="page"><span>📚</span>Lessons</a>
+  <a href="../flash.html"><span>🔧</span>Set up</a>
+  <a href="../#about"><span>❓</span>About</a>
+</nav>
 </body>
 </html>
