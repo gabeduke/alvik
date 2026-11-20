@@ -17,6 +17,12 @@ It started as a toy for our kids' Alvik: the stock demo menu plus a phone remote
 started sending its sensor readings back, and watching them show up on a 3D robot one at a time
 turned out to be the best part. The lessons follow the same steps, so you can see it happen too.
 
+**Who wrote the code:** [Claude](https://claude.com/claude-code), an AI, wrote nearly all of it. A parent
+steers: picks what to build next, tests it on the real robot with the kids, and says what is wrong.
+The point is to show children how a program works and to watch sensor data stream in live, so the
+lessons explain the code in plain words; nobody here claims to have typed it. LEGO servos and Grove
+sensors are next.
+
 Everything is plain files: MicroPython on the robot, a static web page with no build tool, Web
 Bluetooth to drive and Web Serial to put the code on. Not made by or connected with Arduino.
 
@@ -192,11 +198,13 @@ no index file on the robot: delete the folder to uninstall.
 
 ## Ideas / next
 Sketch ideas waiting for hardware (#3): 🦾 claw + catapult (servos), 👀 eyes (OLED).
-- Servos (Geekservo 9g 270°) on servo A/B → claw + catapult buttons (`alvik.set_servo_positions(a, b)`)
+- Servos (Geekservo 9g 270°) on servo A/B → claw + catapult buttons (`alvik.set_servo_positions(a, b)`) (#7)
+- Grove sensors on the Alvik's Grove ports, sent to the page as a new packet and shown on the 3D robot
 - Xbox Wireless Controller (model 1914) via Bluepad32 (needs Arduino C++, not MicroPython)
 - Eyes on the Qwiic port (uses `alvik.i2c`): Adafruit 1.3" 128x64 OLED STEMMA QT (#938) showing moods — happy driving, scared at the bumper, dizzy after a spin, sleepy when idle, angry when picked up
 
 ## Credits and licences
+- The code is MIT ([`LICENSE`](LICENSE)), apart from the files below. It was written by Claude (Anthropic's AI) with a parent directing.
 - The 3D robot is built from Arduino's published Alvik chassis model and the
   ["Arduino Alvik top baseplate (LEGO/DUPLO versions)"](https://makerworld.com/en/models/1298936) by GiulioT,
   which is CC BY-NC-SA. So `docs/models/alvik.glb` is CC BY-NC-SA too: keep the credit, don't sell it. Details: `models/README.md`.
