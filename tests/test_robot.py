@@ -121,6 +121,16 @@ class FakeAlvik:
         self.stopped = True
 
     # helpers for the tests
+    def travelled(self, t):
+        """cm driven forward by time t (ms), from the speeds the robot was told to drive at."""
+        cm, was, speed = 0, 0, 0
+        for when, linear, angular in self.drives:
+            if when > t:
+                break
+            cm += speed * (when - was) / 1000
+            was, speed = when, linear
+        return cm + speed * (t - was) / 1000
+
     def colour_at(self, t):
         """(left, right) colours at time t."""
         cols = {"L": None, "R": None}
@@ -517,6 +527,46 @@ class RemoteDriving(RobotTest):
         self.assertEqual(self.at(robot, 1400)[0], rc.TURBO_SPEED)
         self.assertEqual(self.at(robot, 3900)[0], rc.SPEED, "turbo is off again after reconnecting")
 
+    # The real robot on an open floor, standing level: the left four zones read 16 to 18 cm (the
+    # floor itself) and now and then something far away instead. Read off the robot on 2026-11-20.
+    @staticmethod
+    def open_floor(t):
+        wobble = ((t // 30) * 7 % 23) / 10            # 0 .. 2.2, different every reading
+        far = 180 if (t // 30) % 17 == 0 else None
+        return (far or 16 + wobble, 18.2 - wobble, far or 16.5 + wobble / 2, 17.3, 180)
+
+    def test_open_floor_is_not_something_in_the_way(self):
+        robot, rc = self.drive([(0, (5, True))], until=6000, distance=self.open_floor)
+        self.assertEqual(self.at(robot, 1000)[0], rc.SPEED)
+        self.assertEqual({l for t, l, a in robot.drives if 1000 <= t < 6000}, {rc.SPEED}, "never slows down")
+        self.assertNotIn(RED, [rgb for t, side, rgb in robot.leds], "and never warns")
+
+    def test_a_wall_is_still_slowed_for_and_stopped_at_past_where_the_floor_shows(self):
+        robot = None
+
+        def distance(t):                      # open floor, with a wall 70 cm ahead that the robot drives up to
+            floor = self.open_floor(t)
+            wall = 70 - FakeAlvik.current.travelled(t)
+            return tuple(wall if wall < 45 else f for f in floor)
+        robot, rc = self.drive([(0, (5, True))], until=30000, distance=distance)
+        seen = [(70 - robot.travelled(t), l) for t, l, a in robot.drives if t > 1000]
+        self.assertTrue(all(l == rc.SPEED for wall, l in seen if wall > rc.SLOW_CM + 1), "full speed until 30 cm")
+        self.assertTrue(all(l < rc.SPEED for wall, l in seen if wall < rc.SLOW_CM - 1), "then always slower")
+        for cm in (25, 21, 19, 17, 15, 13):   # no letting go where the floor shows (14 to 20 cm)
+            wall, l = min(seen, key=lambda x: abs(x[0] - cm))
+            self.assertAlmostEqual(l, max(2, rc.SPEED * (wall - rc.BUMPER_CM) / (rc.SLOW_CM - rc.BUMPER_CM)), delta=0.2, msg=cm)
+        self.assertEqual(seen[-1][1], 0, "stopped")
+        self.assertTrue(rc.BUMPER_CM - 0.5 < seen[-1][0] <= rc.BUMPER_CM, seen[-1][0])
+
+    def test_turning_away_from_a_wall_onto_open_floor_lets_go(self):
+        def distance(t):                      # a wall 26 cm ahead; at 2 s the robot has turned away from it
+            return (26 - FakeAlvik.current.travelled(t),) * 5 if t < 2000 else self.open_floor(t)
+        robot, rc = self.drive([(0, (5, True)), (1500, (5, False)), (1500, (7, True)), (2500, (7, False)), (2500, (5, True))],
+                               until=5000, distance=distance)
+        self.assertLess(self.at(robot, 1400)[0], rc.SPEED, "slowed for the wall")
+        self.assertEqual(self.at(robot, 3500)[0], rc.SPEED, "and free again on the open floor")
+        self.assertNotIn(RED, [rgb for t, side, rgb in robot.leds if t > 2600])
+
     def test_bumper_does_not_stop_reversing(self):
         robot, rc = self.drive([(0, (6, True))], distance=lambda t: (5,) * 5)
         self.assertEqual(self.at(robot, 1000)[0], -rc.SPEED)
@@ -532,6 +582,87 @@ def read_telemetry(pkt):
             "left": bits(pkt[5]), "right": bits(pkt[5] >> 3), "speed": s8(pkt[6]) / 5, "turn": s8(pkt[7]) * 3,
             "turbo": bool(pkt[8] & 1), "bumper": bool(pkt[8] & 2), "blocked": bool(pkt[8] & 4),
             "dancing": bool(pkt[8] & 8)}
+
+
+class FloorOrThing(RobotTest):
+    """Zone.see: one zone of the distance sensor, with the floor taken out."""
+
+    def zone(self):
+        import remote_control as rc
+        return rc.Zone(), rc
+
+    def test_the_floor_is_nothing_standing_or_driving(self):
+        zone, rc = self.zone()
+        for i in range(400):
+            reading = 16 + (i * 7 % 23) / 10
+            self.assertIsNone(zone.see(reading, moved=0.25 if i > 50 else 0), reading)
+
+    def test_far_readings_and_nothing_pass_straight_through(self):
+        zone, rc = self.zone()
+        self.assertEqual([zone.see(d) for d in (None, 180, 35.5, 30, None)], [None, 180, 35.5, 30, None])
+
+    def test_a_wall_driven_up_to_stays_a_wall_through_where_the_floor_shows(self):
+        zone, rc = self.zone()
+        for d in (17, 17.4, 16.8):
+            self.assertIsNone(zone.see(d, 0.25))
+        got = []
+        d = 45
+        while d > 9:
+            got.append((d, zone.see(d + (0.4 if int(d * 4) % 2 else -0.4), 0.25)))
+            d -= 0.25
+        self.assertTrue(all(seen is not None for d, seen in got if d < rc.SLOW_CM - 1), [g for g in got if g[1] is None])
+
+    def test_closer_than_the_bumper_distance_counts_at_once(self):
+        zone, rc = self.zone()
+        self.assertEqual(zone.see(11), 11)
+        self.assertEqual(zone.see(12.5), 12.5, "and backing off a little it is still that thing")
+
+    def test_one_odd_reading_is_not_a_thing_but_two_are(self):
+        zone, rc = self.zone()
+        self.assertEqual([zone.see(d) for d in (17, 25, 17, 17)], [None] * 4)
+        self.assertEqual([zone.see(d) for d in (25, 25, 24.8)], [None, 25, 24.8])
+
+    def test_a_thing_that_comes_no_closer_as_we_drive_at_it_is_the_floor(self):
+        zone, rc = self.zone()                 # a thick carpet, or a nose-up robot: the floor shows at 23 cm
+        seen = [zone.see(23 + (i % 3) * 0.3, 0.2) for i in range(60)]
+        self.assertEqual(seen[1], 23.3, "taken for a thing at first")
+        gone = seen.index(None, 1)
+        self.assertLessEqual(gone * 0.2, rc.FLOOR_PROOF_CM + 0.5, "let go after driving this far")
+        self.assertEqual(set(seen[gone:]), {None}, "and it stays the floor")
+        self.assertIsNone(zone.see(22.5), "standing still too")
+        self.assertEqual([zone.see(d, 0.2) for d in (19.5, 19, 18.5)], [None, 19, 18.5], "something nearer than that floor is a thing")
+
+    def test_a_wobble_in_the_floor_reading_does_not_stick(self):
+        zone, rc = self.zone()                 # the real robot's left zone: 15 to 20.6 cm on a still floor
+        self.assertEqual([zone.see(d) for d in (17, 20.4, 20.6, 19.8, 17.2, 16)], [None, None, 20.6, None, None, None])
+
+    def test_standing_still_nothing_is_decided(self):
+        zone, rc = self.zone()
+        self.assertEqual([zone.see(24) for _ in range(200)][-1], 24, "a thing stays a thing until we drive at it")
+
+    def test_a_wall_met_at_an_angle_keeps_coming_closer_slowly_and_stays_a_wall(self):
+        zone, rc = self.zone()
+        d, seen = 29.0, []
+        while d > 13:
+            seen.append(zone.see(d, 0.25))
+            d -= 0.12                          # half as fast as we drive
+        self.assertNotIn(None, seen[1:])
+
+    def test_looking_somewhere_else_it_is_the_floor_again(self):
+        zone, rc = self.zone()
+        for d in (25, 24.5, 24):               # a wall
+            zone.see(d, 0.25)
+        self.assertIsNone(zone.see(17.2, 0.25), "the wall slid out of view: a jump down to the floor")
+        zone, rc = self.zone()
+        d = 26
+        while d >= 20:                         # a wall driven up to, close to where the floor shows: no jump when it goes
+            zone.see(d, 0.25)
+            d -= 0.25
+        seen = [zone.see(18.5, 0, turned=3) for _ in range(4)]
+        self.assertEqual(seen[:2], [18.5, 18.5], "not yet")
+        self.assertIsNone(seen[-1], "but after turning away it is")
+        self.assertEqual([zone.see(d, 0, turned=3) for d in (26, 26, 26, 26, 26)], [None, 26, 26, 26, 26],
+                         "turning with a real thing in view: it stays")
 
 
 class Telemetry(RobotTest):

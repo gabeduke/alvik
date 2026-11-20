@@ -16,6 +16,7 @@
 //
 //   '!' 'S' <left> <half left> <middle> <half right> <right> <roll> <pitch> <battery> <checksum>
 //     five distances in cm, as the sensor sees them from left to right; 255 = nothing seen
+//     (the robot leaves out the floor, which the sensor also sees: Zone.see in remote_control.py)
 //     roll, pitch   int8, whole degrees, as the robot's IMU reports them
 //     battery       0..100 percent; 255 = not known
 //

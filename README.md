@@ -54,6 +54,8 @@ If several boards are plugged in: `mpr connect /dev/cu.usbmodemXXXX ...`
 
 The robot speeds up gently and slows down as it gets close to things (bumper on), then stops 12 cm away. The lights blink red while it is slowing down and flash red fast once it has stopped. Tune it at the top of `src/remote_control.py` (`ACCEL`, `DECEL`, `SLOW_CM`, `BUMPER_CM`).
 
+The distance sensor looks slightly down, so on an empty floor it sees the floor itself about 17 cm ahead. The robot tells that from a real thing (a real thing comes closer as you drive at it, the floor doesn't) and does not slow down for it; the 3D robot on the web remote doesn't show it either. If it still crawls and blinks red on some floor, tune `FLOOR_CM` and `FLOOR_SLACK_CM` in the same place.
+
 ## Web remote (`docs/index.html`)
 **Live: https://gabeduke.github.io/alvik/** (GitHub Pages via `.github/workflows/pages.yml`, redeploys on every push to `main`)
 Installable app: Chrome → Install (or Android "Add to Home screen"). It works offline. Installed copies update themselves: the build stamps the commit into `sw.js`, and the page reloads on its own (`docs/pwa.js`), but never while the robot is connected or a flash is running.
