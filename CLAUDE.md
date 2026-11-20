@@ -21,6 +21,7 @@ Arduino Alvik robot (MicroPython, ESP32) for the kids, plus a web remote. Backlo
 - Nordic UART service `6E400001-…`, robot advertises as `Alvik`. Phone writes to RX `6E400002-…`.
 - Bluefruit Connect Control Pad packets: `'!' 'B' <'1'..'8'> <'1' down | '0' up> <checksum = ~sum(first 4) & 0xFF>`.
 - Buttons: 1 lights, 2 turbo (toggle), 3 disco dance, 4 bumper (toggle, on by default), 5 up, 6 down, 7 left, 8 right. Arrows are hold-to-drive (Bluefruit app only; the web remote drives with the joystick).
+- Web remote drive layouts (`body[data-layout]`, saved in localStorage `alvik-layout`): `stick`, `two` (throttle + steer sliders), `mouse` (click to grab). All feed one (x, y) and the same packet.
 - Web remote joystick packet: `'!' 'J' <x int8> <y int8> <checksum>`, -100..100, x right, y forward. The page repeats it every 150 ms while held; the robot stops after 600 ms of silence. Speeds ramp (`ramp()`), and the bumper slows from 30 cm and stops at 12 cm (`bumper_limit()`).
 - **One connection at a time.** While anything is connected the robot stops advertising, so the web page can't see it until the Bluefruit app disconnects (lights go yellow = advertising).
 - Web Bluetooth: Chrome/Edge on Android, macOS, Windows. Not iPad/iOS Safari (use the Bluefy app). macOS needs Chrome allowed under Privacy & Security → Bluetooth.

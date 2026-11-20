@@ -29,7 +29,7 @@
   header { width: 100%; max-width: 900px; display: flex; align-items: center; gap: 12px; }
   h1 { margin: 0; font-size: 28px; flex: 1; }
   #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  @media (max-width: 560px) { #statusText, #toolsText { display: none; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
+  @media (max-width: 560px) { #statusText, #toolsText, #layoutText, #title { display: none; } #layout { font-size: 18px; padding: 8px 10px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
   #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; }
   #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
   #connect {
@@ -85,6 +85,53 @@
     60% { background: #3fa9f5 } 80% { background: #c86bfa } 100% { background: #ff3b3b }
   }
   .action.dancing { animation: disco .6s linear infinite; }
+  /* two-hand layout: left thumb = speed, right thumb = steering */
+  .slider {
+    display: none; position: relative; border-radius: 999px; touch-action: none; cursor: grab;
+    background: var(--panel); box-shadow: inset 0 0 0 6px rgba(255,255,255,.08), 0 6px 0 rgba(0,0,0,.35);
+    align-items: center; justify-content: center; transition: opacity .2s;
+  }
+  .slider.disabled { opacity: .35; cursor: default; }
+  .slider .knob {
+    border-radius: 50%; pointer-events: none; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 35% 30%, #8fd0ff, var(--up) 60%);
+    box-shadow: 0 6px 0 rgba(0,0,0,.35); transition: transform .12s ease-out;
+  }
+  .slider.active .knob { transition: none; filter: brightness(1.15); }
+  .slider .mark { position: absolute; color: var(--muted); opacity: .6; pointer-events: none; font-size: 22px; }
+  #throttle { --w: min(26vw, 130px); width: var(--w); height: min(38vh, 320px); }
+  #steer { --w: min(26vw, 130px); height: var(--w); width: min(52vw, 320px); }
+  .slider .knob { width: calc(var(--w) - 16px); height: calc(var(--w) - 16px); font-size: calc(var(--w) * .4); }
+  #throttle .mark.n { top: 8px; } #throttle .mark.s { bottom: 8px; }
+  #steer .mark.w { left: 12px; } #steer .mark.e { right: 12px; }
+  body[data-layout="two"] #stick { display: none; }
+  body[data-layout="two"] .slider { display: flex; }
+  body[data-layout="two"] main {
+    display: grid; grid-template-areas: "a a" "t s"; justify-items: center; align-items: center;
+    justify-content: space-between; align-content: space-around;
+  }
+  body[data-layout="two"] #throttle { grid-area: t; }
+  body[data-layout="two"] #steer { grid-area: s; }
+  body[data-layout="two"] .actions { grid-area: a; grid-template-columns: repeat(4, min(21vw, 150px)); gap: 10px; }
+  body[data-layout="two"] button.big.action { height: min(21vw, 22vh, 130px); font-size: min(3.6vw, 18px); }
+  body[data-layout="two"] .action .emoji { font-size: min(8vw, 44px); }
+  body[data-layout="two"] .action .state { font-size: 12px; }
+  @media (min-aspect-ratio: 1/1) {
+    body[data-layout="two"] main { grid-template-areas: "t a s"; grid-template-columns: auto 1fr auto; }
+    #throttle { --w: min(16vw, 130px); height: min(62vh, 340px); }
+    #steer { --w: min(16vw, 130px); width: min(30vw, 340px); }
+    body[data-layout="two"] .actions { grid-template-columns: repeat(2, min(15vw, 150px)); gap: 14px; }
+    body[data-layout="two"] button.big.action { height: min(15vw, 28vh, 150px); font-size: min(2.2vw, 20px); }
+    body[data-layout="two"] .action .emoji { font-size: min(6vw, 12vh, 52px); }
+  }
+  /* mouse layout: a bigger pad; click to grab the ball, click again to let go */
+  body[data-layout="mouse"] .stick { --size: min(80vw, 62vh, 460px); cursor: pointer; }
+  #hint { color: var(--muted); font-size: 15px; text-align: center; min-height: 1.2em; }
+  #hint:empty { display: none; }
+  #layout {
+    font: inherit; font-size: 15px; font-weight: 700; color: var(--muted); background: var(--panel);
+    border: 0; border-radius: 12px; padding: 10px 12px; white-space: nowrap; cursor: pointer;
+  }
   footer { color: var(--muted); font-size: 14px; text-align: center; }
   #tools {
     font-size: 15px; font-weight: 700; text-decoration: none; color: var(--muted);
@@ -94,8 +141,9 @@
 </head>
 <body>
 <header>
-  <h1>🤖 Alvik</h1>
+  <h1>🤖<span id="title"> Alvik</span></h1>
   <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
+  <button id="layout" title="Change how you drive: one hand, two hands or mouse"><span id="layoutIcon">🕹️</span><span id="layoutText"> One hand</span></button>
   <a id="tools" href="flash.html" title="Grown-ups: put new code on the robot over USB">🔧<span id="toolsText"> Update robot</span></a>
   <button id="connect">Connect</button>
 </header>
@@ -107,6 +155,12 @@
     <span class="mark n">▲</span><span class="mark w">◀</span><span class="mark e">▶</span><span class="mark s">▼</span>
     <div id="knob">🤖</div>
   </div>
+  <div class="slider disabled" id="throttle" role="application" aria-label="Speed: slide up to go forward, down to go back">
+    <span class="mark n">▲</span><span class="mark s">▼</span><div class="knob">🚗</div>
+  </div>
+  <div class="slider disabled" id="steer" role="application" aria-label="Steering: slide left or right">
+    <span class="mark w">◀</span><span class="mark e">▶</span><div class="knob">↔️</div>
+  </div>
 
   <div class="actions">
     <button class="big action" data-b="1"><span class="emoji">💡</span>Lights<span class="state"></span></button>
@@ -115,6 +169,8 @@
     <button class="big action" data-b="4"><span class="emoji">🛡️</span>Bumper<span class="state" id="bumperState">on</span></button>
   </div>
 </main>
+
+<div id="hint"></div>
 
 <footer>On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</footer>
 
@@ -158,21 +214,40 @@ function send(button, pressed) {
   if (rx) write(packet("B", 48 + button, pressed ? 0x31 : 0x30));
 }
 
-// ---------- joystick ----------
-const stickEl = $("stick"), knob = $("knob");
+// ---------- driving ----------
+// Three layouts, picked with the button in the header and remembered on this device:
+//   stick = one joystick · two = left thumb speed + right thumb steering · mouse = click to grab, click to let go
+// Arrow keys / WASD work in all of them.
+const stickEl = $("stick"), knob = $("knob"), throttleEl = $("throttle"), steerEl = $("steer");
+const controls = [stickEl, throttleEl, steerEl];
 const DEAD = 0.18;                      // middle of the stick does nothing (per axis: easy to go straight)
-const ARROWS = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-let stickPointer = null, pointerVec = [0, 0];
+const ARROWS = {
+  ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+  KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0],
+};
+const LAYOUTS = {
+  stick: ["🕹️", "One hand", ""],
+  two: ["🙌", "Two hands", ""],
+  mouse: ["🖱️", "Mouse", "Click the ball to grab it. Click again to let go."],
+};
+let layout = "stick";
+const touch = { x: 0, y: 0 };           // what the on-screen controls say, each -1..1
+let grabbed = false;                    // mouse layout: the ball follows the mouse
 const arrowsDown = new Set();
+const dragResets = [];
 let want = [0, 0], sent = [0, 0], sentAt = 0, stickBusy = false;
 
 const shape = (v) => Math.abs(v) < DEAD ? 0 : Math.sign(v) * (Math.abs(v) - DEAD) / (1 - DEAD);
+const clamp = (v) => Math.max(-1, Math.min(1, v));
 
 function updateStick() {
-  let x = 0, y = 0;
-  if (stickPointer !== null) [x, y] = pointerVec;
-  else for (const k of arrowsDown) { x += ARROWS[k][0]; y += ARROWS[k][1]; }
-  knob.style.transform = `translate(${x * 75}%, ${-y * 75}%)`;
+  let x = touch.x, y = touch.y;
+  for (const k of arrowsDown) { x += ARROWS[k][0]; y += ARROWS[k][1]; }
+  x = clamp(x); y = clamp(y);
+  const s = stickEl.getBoundingClientRect(), t = throttleEl.getBoundingClientRect(), h = steerEl.getBoundingClientRect();
+  knob.style.transform = `translate(${x * s.width * 0.3}px, ${-y * s.width * 0.3}px)`;
+  throttleEl.querySelector(".knob").style.transform = `translateY(${-y * (t.height - t.width) / 2}px)`;
+  steerEl.querySelector(".knob").style.transform = `translateX(${x * (h.width - h.height) / 2}px)`;
   want = [Math.round(shape(x) * 100), Math.round(shape(y) * 100)];
   pumpStick();
 }
@@ -190,47 +265,85 @@ function pumpStick() {
 }
 setInterval(pumpStick, 50);
 
-function pointerToVec(e) {
+function readStick(e) {
   const r = stickEl.getBoundingClientRect();
   const reach = r.width * 0.3;
   let x = (e.clientX - (r.left + r.width / 2)) / reach;
   let y = -(e.clientY - (r.top + r.height / 2)) / reach;
   const len = Math.hypot(x, y);
   if (len > 1) { x /= len; y /= len; }
-  return [x, y];
+  touch.x = x; touch.y = y;
+}
+function readThrottle(e) {
+  const r = throttleEl.getBoundingClientRect();
+  touch.y = clamp(-(e.clientY - (r.top + r.height / 2)) / ((r.height - r.width) / 2));
+}
+function readSteer(e) {
+  const r = steerEl.getBoundingClientRect();
+  touch.x = clamp((e.clientX - (r.left + r.width / 2)) / ((r.width - r.height) / 2));
 }
 
-function centreStick() {
-  stickPointer = null;
-  pointerVec = [0, 0];
-  arrowsDown.clear();
-  stickEl.classList.remove("active");
-  updateStick();
+// hold and drag (finger, pen, or mouse outside the mouse layout); letting go springs back
+function drag(el, read, clear) {
+  let id = null;
+  const end = (e) => {
+    if (e.pointerId !== id) return;
+    id = null; el.classList.remove("active"); clear(); updateStick();
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (!rx || id !== null) return;
+    if (el === stickEl && layout === "mouse" && e.pointerType === "mouse") return;   // click-to-grab, below
+    e.preventDefault();
+    el.setPointerCapture?.(e.pointerId);
+    id = e.pointerId; el.classList.add("active"); read(e); updateStick();
+  });
+  el.addEventListener("pointermove", (e) => { if (e.pointerId === id) { read(e); updateStick(); } });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => el.addEventListener(t, end));
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  dragResets.push(() => { id = null; el.classList.remove("active"); });
 }
+drag(stickEl, readStick, () => { touch.x = 0; touch.y = 0; });
+drag(throttleEl, readThrottle, () => { touch.y = 0; });
+drag(steerEl, readSteer, () => { touch.x = 0; });
 
+// mouse layout: click grabs the ball (no holding the button), click again or leave the pad to let go
 stickEl.addEventListener("pointerdown", (e) => {
-  if (!rx || stickPointer !== null) return;
+  if (!rx || layout !== "mouse" || e.pointerType !== "mouse") return;
   e.preventDefault();
-  stickEl.setPointerCapture?.(e.pointerId);
-  stickPointer = e.pointerId;
-  stickEl.classList.add("active");
-  pointerVec = pointerToVec(e);
+  grabbed = !grabbed;
+  stickEl.classList.toggle("active", grabbed);
+  if (grabbed) readStick(e); else { touch.x = 0; touch.y = 0; }
   updateStick();
 });
 stickEl.addEventListener("pointermove", (e) => {
-  if (e.pointerId !== stickPointer) return;
-  pointerVec = pointerToVec(e);
-  updateStick();
+  if (grabbed && e.pointerType === "mouse") { readStick(e); updateStick(); }
 });
-["pointerup", "pointercancel", "lostpointercapture"].forEach((t) =>
-  stickEl.addEventListener(t, (e) => {
-    if (e.pointerId !== stickPointer) return;
-    stickPointer = null;
-    pointerVec = [0, 0];
-    stickEl.classList.remove("active");
-    updateStick();
-  }));
-stickEl.addEventListener("contextmenu", (e) => e.preventDefault());
+stickEl.addEventListener("pointerleave", () => { if (grabbed) centreStick(); });
+
+function centreStick() {
+  grabbed = false;
+  touch.x = 0; touch.y = 0;
+  arrowsDown.clear();
+  dragResets.forEach((f) => f());
+  updateStick();
+}
+
+function setLayout(name) {
+  if (!LAYOUTS[name]) name = "stick";
+  centreStick();
+  layout = name;
+  document.body.dataset.layout = name;
+  $("layoutIcon").textContent = LAYOUTS[name][0];
+  $("layoutText").textContent = " " + LAYOUTS[name][1];
+  $("hint").textContent = LAYOUTS[name][2];
+  try { localStorage.setItem("alvik-layout", name); } catch {}
+  updateStick();
+}
+$("layout").addEventListener("click", () => {
+  const names = Object.keys(LAYOUTS);
+  setLayout(names[(names.indexOf(layout) + 1) % names.length]);
+});
+addEventListener("resize", updateStick);
 
 function setConnected(on) {
   if (!on) pwa?.idle();
@@ -239,7 +352,7 @@ function setConnected(on) {
   $("connect").textContent = on ? "Disconnect" : "Connect";
   $("connect").classList.toggle("connected", on);
   allButtons.forEach((b) => (b.disabled = !on));
-  stickEl.classList.toggle("disabled", !on);
+  controls.forEach((c) => c.classList.toggle("disabled", !on));
   sent = [0, 0]; stickBusy = false;      // a robot we just met is standing still
   if (on) {
     turbo = false; bumper = true; showToggles();
@@ -319,6 +432,7 @@ allButtons.forEach((el) => {
 // keyboard on a laptop: arrows push the joystick all the way, 1-4 for the action buttons
 const KEYS = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4 };
 addEventListener("keydown", (e) => {
+  if (e.code === "Escape") { centreStick(); return; }
   if (ARROWS[e.code] && rx) {
     e.preventDefault();
     if (!e.repeat) { arrowsDown.add(e.code); updateStick(); }
@@ -340,6 +454,9 @@ document.addEventListener("visibilitychange", () => document.hidden && releaseAl
 
 $("connect").addEventListener("click", connect);
 setConnected(false);
+let savedLayout = "stick";
+try { savedLayout = localStorage.getItem("alvik-layout") || "stick"; } catch {}
+setLayout(savedLayout);
 
 if (!navigator.bluetooth) {
   $("connect").disabled = true;

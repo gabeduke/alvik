@@ -21,133 +21,189 @@
     padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px;
     line-height: 1.4;
   }
-  header, section, #result, details { width: 100%; max-width: 720px; }
+  header, .intro, section, body > details { width: 100%; max-width: 720px; }
   header { display: flex; align-items: center; gap: 12px; }
   h1 { margin: 0; font-size: 28px; flex: 1; }
-  h2 { margin: 0 0 10px; font-size: 20px; }
   a { color: var(--up); }
-  header a { font-size: 18px; text-decoration: none; }
+  header a {
+    font-size: 15px; font-weight: 700; text-decoration: none; color: var(--muted);
+    background: var(--panel); border-radius: 12px; padding: 10px 12px; white-space: nowrap;
+  }
+  .intro { margin: 0; color: var(--muted); font-size: 17px; }
   section { background: var(--panel); border-radius: 18px; padding: 16px 18px; }
-  .notes { color: var(--muted); font-size: 16px; }
-  .notes ul { margin: 0; padding-left: 20px; }
-  .notes li + li { margin-top: 4px; }
-  .notes b { color: var(--text); }
+  #unsupported { background: #4a2030; font-size: 18px; }
+  .muted { color: var(--muted); font-size: 16px; margin: 0; }
+  .bad { color: var(--bad); }
+
+  /* the three steps */
+  h2 { margin: 0 0 6px; font-size: 21px; display: flex; align-items: center; gap: 10px; }
+  .num {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--up); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800;
+  }
+  .step.done .num { background: var(--bumper); color: var(--bg); font-size: 0; }
+  .step.done .num::before { content: "✓"; font-size: 20px; }
+  .step > .muted { margin-bottom: 12px; }
   .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   button {
-    font: inherit; font-size: 18px; font-weight: 700; border: 0; border-radius: 14px;
-    padding: 10px 18px; background: var(--up); color: #fff; cursor: pointer;
+    font: inherit; font-size: 20px; font-weight: 700; border: 0; border-radius: 14px;
+    padding: 12px 20px; background: var(--up); color: #fff; cursor: pointer;
     box-shadow: 0 4px 0 rgba(0,0,0,.35);
   }
   button:disabled { opacity: .4; cursor: default; }
-  button.quiet { background: transparent; color: var(--muted); box-shadow: none; padding: 6px 10px; font-size: 15px; }
-  #flash { background: var(--bumper); color: var(--bg); font-size: 22px; padding: 12px 28px; }
-  #status { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  #connect.connected { background: rgba(255,255,255,.1); color: var(--muted); font-size: 16px; padding: 9px 14px; box-shadow: none; }
+  #status { color: var(--muted); font-size: 17px; display: flex; align-items: center; gap: 8px; }
   #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; flex: none; }
   #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
   #dot.busy { background: var(--lights); box-shadow: 0 0 10px var(--lights); }
-  label.small { color: var(--muted); font-size: 15px; display: flex; align-items: center; gap: 6px; }
-  #files { list-style: none; margin: 0 0 12px; padding: 0; }
-  #files li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px; padding: 6px 0; }
-  #files li + li { border-top: 1px solid rgba(255,255,255,.08); }
-  #files input { width: 20px; height: 20px; accent-color: var(--bumper); }
-  #files .name { font-family: ui-monospace, Menlo, monospace; font-size: 16px; overflow-wrap: anywhere; }
-  #files .size { color: var(--muted); font-size: 14px; }
-  #files .state { grid-column: 2 / 4; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; min-height: 0; }
-  #files .state:empty { display: none; }
-  #files .ok { color: var(--bumper); }
-  #files .bad { color: var(--bad); }
-  progress { width: 140px; height: 8px; accent-color: var(--up); }
-  #result { font-size: 19px; text-align: center; }
-  #result:empty { display: none; }
-  #result .hint { display: block; color: var(--muted); font-size: 16px; margin-top: 4px; }
-  #unsupported { background: #4a2030; color: var(--text); font-size: 18px; }
-  details { color: var(--muted); font-size: 14px; }
-  summary { cursor: pointer; }
-  #sketches { display: grid; gap: 12px; }
-  .card { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; background: rgba(255,255,255,.06); border-radius: 16px; padding: 14px; }
-  .card .emoji { font-size: 44px; line-height: 1; grid-row: span 2; }
-  .card h3 { margin: 0; font-size: 21px; }
-  .card p { margin: 2px 0 6px; color: var(--muted); font-size: 16px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  label.small { color: var(--muted); font-size: 15px; display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+
+  /* step 2: what goes on the robot */
+  .card { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; align-items: start; border-radius: 16px; padding: 14px; }
+  .card .emoji { font-size: 42px; line-height: 1; }
+  .card h3 { margin: 0; font-size: 20px; }
+  .card p { margin: 2px 0 0; color: var(--muted); font-size: 16px; }
+  .tag { display: inline-block; font-size: 14px; font-weight: 700; border-radius: 999px; padding: 4px 12px; margin-top: 8px; }
+  #core { background: rgba(61,220,132,.1); border: 2px solid rgba(61,220,132,.45); }
+  #core .tag { background: transparent; color: var(--bumper); padding-left: 0; }
+  #core details { grid-column: 1 / -1; margin-top: 10px; }
+  details { color: var(--muted); font-size: 15px; }
+  summary { cursor: pointer; padding: 4px 0; }
+  .extras { margin: 18px 0 4px; font-size: 18px; }
+  .extras small { color: var(--muted); font-weight: 400; font-size: 15px; }
+  #sketches { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 10px; }
+  #sketches > p { grid-column: 1 / -1; }
+  .pick { position: relative; background: rgba(255,255,255,.06); border: 2px solid transparent; cursor: pointer; }
+  .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .pick:has(input:focus-visible) { outline: 3px solid var(--up); outline-offset: 2px; }
+  .pick .tag { background: var(--disco); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.35); font-size: 16px; padding: 6px 16px; }
+  .pick.picked { border-color: var(--disco); background: rgba(200,107,250,.14); }
+  .pick.picked .tag { background: transparent; color: var(--disco); box-shadow: none; padding-left: 0; }
+  .pick.locked { cursor: default; opacity: .6; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip { font-size: 13px; padding: 2px 9px; border-radius: 999px; background: rgba(255,255,255,.1); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
   .swatch { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); }
-  .card .go { grid-column: 2; justify-self: start; margin-top: 8px; background: var(--disco); }
-  .card .cstate { grid-column: 1 / -1; font-size: 15px; color: var(--muted); }
-  .card .cstate:empty { display: none; }
-  .card .cstate.ok { color: var(--bumper); }
-  .card .cstate.bad { color: var(--bad); }
-  @media (max-width: 420px) { .card { grid-template-columns: 1fr; } .card .emoji { grid-row: auto; } .card .go { grid-column: 1; } }
+
+  /* "what gets copied": a detail, not a choice */
+  #files { list-style: none; margin: 6px 0 0; padding: 0; }
+  #files li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; padding: 5px 0; }
+  #files li + li { border-top: 1px solid rgba(255,255,255,.08); }
+  #files li.group { color: var(--text); font-weight: 700; font-size: 14px; border-top: 0; padding-top: 12px; }
+  #files .name { font-family: ui-monospace, Menlo, monospace; font-size: 14px; overflow-wrap: anywhere; }
+  #files .size { font-size: 13px; }
+  #files .state { grid-column: 1 / -1; font-size: 13px; }
+  #files .state:empty { display: none; }
+  #files .ok { color: var(--bumper); }
+
+  /* step 3: one big button */
+  #plan { font-size: 18px; margin: 0 0 14px; }
+  #plan b { white-space: nowrap; }
+  #flash { background: var(--bumper); color: var(--bg); font-size: 24px; font-weight: 800; padding: 16px 28px; width: 100%; border-radius: 18px; box-shadow: 0 6px 0 rgba(0,0,0,.35); }
+  #hint { margin-top: 10px; text-align: center; }
+  #hint:empty { display: none; }
+  #progress { margin-top: 14px; }
+  #progress progress { width: 100%; height: 14px; accent-color: var(--lights); }
+  #progressText { color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
+  #result { margin-top: 14px; font-size: 19px; border-radius: 14px; padding: 12px 14px; background: rgba(255,255,255,.07); }
+  #result:empty { display: none; }
+  #result.ok { background: rgba(61,220,132,.14); }
+  #result.bad { background: rgba(255,92,92,.16); color: var(--text); }
+  #result .hint { display: block; color: var(--muted); font-size: 16px; margin-top: 6px; }
+  #result ul { margin: 8px 0 0; padding-left: 0; list-style: none; font-size: 17px; }
+
+  #help ul { margin: 6px 0 0; padding-left: 20px; font-size: 16px; }
+  #help li + li { margin-top: 4px; }
+  #help b { color: var(--text); }
   #log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; background: #120e22; border-radius: 12px; padding: 10px; margin-top: 8px; font-size: 12px; }
+  @media (max-width: 420px) { h1 { font-size: 24px; } .card .emoji { font-size: 34px; } #flash { font-size: 22px; padding: 16px 12px; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>🔧 Flash the robot</h1>
-  <a href="./">← Remote</a>
+  <h1>🔧 Update the robot</h1>
+  <a href="./">🎮 Remote</a>
 </header>
 
+<p class="intro">Copies the newest robot code from this website onto the Alvik over a USB cable. Three steps.</p>
+
 <section id="unsupported" hidden>
-  This browser can't talk to USB devices. Open this page in <b>Chrome</b> or <b>Edge</b> on a computer
-  (Mac, Windows, Linux or Chromebook). iPad, iPhone and Android can't flash the robot.
+  😕 This browser can't talk to USB. Open this page in <b>Chrome</b> or <b>Edge</b> on a computer
+  (Mac, Windows, Linux or Chromebook). iPad, iPhone and Android can't do it.
 </section>
 
-<section class="notes">
-  <h2>Before you start</h2>
-  <ul>
-    <li>This copies the robot code from this website onto the Alvik over a <b>USB-C cable</b>, then restarts it into the colour menu.</li>
-    <li><b>Chrome or Edge on a computer</b> only. iPad and Android phones can't do this.</li>
-    <li>Close <b>Arduino Lab for MicroPython</b> (and Thonny, mpremote or any serial monitor) first: only one program can use the USB port.</li>
-    <li><b>“Port busy” or “couldn't open”?</b> Close the other program, unplug the cable, plug it back in and press Connect again.</li>
-    <li>It works even if the robot is stuck: it stops whatever is running first.</li>
-    <li>A <b>sketch</b> is an extra program for the menu. Flashing one also updates the menu itself. After the restart, press ⬆ until you see the sketch's colour, then ✓.</li>
-  </ul>
-</section>
-
-<section>
-  <h2>1. Connect</h2>
+<section class="step" id="step1">
+  <h2><span class="num">1</span>Plug in the robot</h2>
+  <p class="muted">Use a USB-C cable and switch the robot on. Press the button, then pick the robot in the list.</p>
   <div class="row">
     <button id="connect">🔌 Connect USB</button>
     <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
   </div>
-  <label class="small" style="margin-top:10px"><input type="checkbox" id="allPorts"> Robot not in the list? Show all USB ports</label>
+  <label class="small"><input type="checkbox" id="allPorts"> Robot not in the list? Show all USB ports</label>
 </section>
 
-<section>
-  <h2>2. Add a sketch</h2>
-  <div id="sketches"><p class="notes">Loading the sketches…</p></div>
-</section>
-
-<section>
-  <h2>3. Or flash just the robot's own code</h2>
-  <ul id="files"><li><span></span><span class="size">Loading the file list…</span></li></ul>
-  <div class="row">
-    <button id="flash" disabled>⚡ Flash</button>
-    <button class="quiet" id="all">All</button>
-    <button class="quiet" id="none">None</button>
+<section class="step" id="step2">
+  <h2><span class="num">2</span>Choose what goes on it</h2>
+  <div class="card" id="core">
+    <div class="emoji">🤖</div>
+    <div>
+      <h3>The robot's main program</h3>
+      <p>The colour menu, the phone remote and the built-in games.</p>
+      <span class="tag">✓ Always updated</span>
+    </div>
+    <details id="filesBox">
+      <summary>What gets copied</summary>
+      <ul id="files"><li><span class="size">Loading the file list…</span></li></ul>
+    </details>
   </div>
+
+  <h3 class="extras">✨ Extras <small>(sketches) – add any you like, or none</small></h3>
+  <p class="muted">Each one shows up as a new colour in the robot's menu. Extras already on the robot stay there.</p>
+  <div id="sketches"><p class="muted">Loading the extras…</p></div>
 </section>
 
-<div id="result" role="status"></div>
+<section class="step" id="step3">
+  <h2><span class="num">3</span>Copy it to the robot</h2>
+  <p id="plan"></p>
+  <button id="flash" disabled>⚡ Update the robot</button>
+  <p class="muted" id="hint"></p>
+  <div id="progress" hidden>
+    <progress id="bar" max="100" value="0"></progress>
+    <div id="progressText"></div>
+  </div>
+  <div id="result" role="status"></div>
+</section>
+
+<details id="help">
+  <summary>🛟 Not working?</summary>
+  <ul>
+    <li><b>Chrome or Edge on a computer</b> only. iPad, iPhone and Android can't do this.</li>
+    <li>Close <b>Arduino Lab for MicroPython</b> (and Thonny, mpremote or any serial monitor): only one program can use the USB port.</li>
+    <li><b>“Port busy” or “couldn't open”?</b> Close the other program, unplug the cable, plug it back in and press Connect again.</li>
+    <li>It works even if the robot is stuck: it stops whatever is running first.</li>
+    <li>After it restarts, pick an extra on the robot: press ⬆ until the lights show its colour, then ✓.</li>
+  </ul>
+</details>
 
 <details>
-  <summary>Log</summary>
+  <summary>Log (for grown-up debugging)</summary>
   <div id="log"></div>
 </details>
 
 <script type="module">
 import { initPwa } from "./pwa.js";
-import { loadIndex, loadFile, loadSketchList, loadSketchFiles, openSerial, flashFiles, FlashError, USB_FILTERS } from "./flasher.js";
+import { loadIndex, loadBundle, loadSketchList, loadSketchFiles, openSerial, flashFiles, FlashError, USB_FILTERS } from "./flasher.js";
 
 const $ = (id) => document.getElementById(id);
 const site = new URL("./", location.href);
 const base = new URL("robot/", site);
-let entries = [];          // from robot/index.json
+let core = null;           // robot/index.json entries; null = not loaded (yet)
+let coreError = "";
 let port = null, transport = null, flashing = false;
-const rows = new Map();    // path -> { li, box, state }
-const cards = [];          // { sketch, go, state }
+const rows = new Map();    // robot path -> the .state element in "What gets copied"
+const cards = [];          // { sketch, card, box, tag, files } for each extra; files = its index.json entries
 const COLOR_NAMES = { "1,0,0": "red", "0,1,0": "green", "0,0,1": "blue", "1,1,0": "yellow", "0,1,1": "cyan", "1,0,1": "purple", "1,1,1": "white" };
 
-const pwa = initPwa({ isBusy: () => flashing, name: "This page", whenBusy: "It will reload when flashing is done." });
+const pwa = initPwa({ isBusy: () => flashing, name: "This page", whenBusy: "It will reload when the copying is done." });
 
 function log(text) {
   const el = $("log");
@@ -155,30 +211,102 @@ function log(text) {
   el.scrollTop = el.scrollHeight;
 }
 
-function result(html, hint = "") {
-  $("result").innerHTML = html + (hint ? `<span class="hint">${hint}</span>` : "");
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+// The message under the big button. cls: "ok", "bad" or "". extra: an element to add (the "how to find it" list).
+function result(html, hint = "", cls = "", extra = null) {
+  const box = $("result");
+  box.className = cls;
+  box.innerHTML = html + (hint ? `<span class="hint">${hint}</span>` : "");
+  if (html && extra) box.insertBefore(extra, box.querySelector(".hint"));
 }
 
 function errorText(e) {
   return e instanceof FlashError ? e.message : `Something went wrong: ${e.message || e}`;
 }
 
+function colorName(rgb) {
+  return COLOR_NAMES[rgb.map((c) => (c ? 1 : 0)).join(",")] || "lit";
+}
+
+const picked = () => cards.filter((c) => c.box.checked);
+
 function update() {
   const on = !!transport;
   $("dot").className = flashing ? "busy" : on ? "on" : "";
-  $("statusText").textContent = flashing ? "Flashing…" : on ? "Connected" : "Not connected";
+  if (!flashing) $("statusText").textContent = on ? "Connected" : "Not connected";
   $("connect").textContent = on ? "Disconnect" : "🔌 Connect USB";
+  $("connect").className = on ? "connected" : "";
   $("connect").disabled = flashing || !navigator.serial;
-  const picked = [...rows.values()].filter((r) => r.box.checked).length;
-  $("flash").disabled = flashing || !on || picked === 0;
-  $("flash").textContent = picked && picked < rows.size ? `⚡ Flash ${picked} file${picked > 1 ? "s" : ""}` : "⚡ Flash";
-  for (const r of rows.values()) r.box.disabled = flashing;
-  $("all").disabled = $("none").disabled = flashing;
+  $("step1").classList.toggle("done", on);
+
+  const extras = picked();
   for (const c of cards) {
-    c.go.disabled = flashing || !on;
-    c.go.title = on ? "" : "Connect USB first";
+    c.box.disabled = flashing;
+    c.card.classList.toggle("picked", c.box.checked);
+    c.card.classList.toggle("locked", flashing);
+    c.tag.textContent = c.box.checked ? "✓ Added (tap to take off)" : "＋ Add";
+  }
+  $("plan").innerHTML = "This copies <b>🤖 the main program</b>"
+    + extras.map((c) => ` + <b>${c.sketch.emoji} ${escapeHtml(c.sketch.title)}</b>`).join("")
+    + ", then the robot restarts into its colour menu.";
+  $("flash").disabled = flashing || !on;
+  $("flash").textContent = flashing ? "⏳ Copying… don't unplug" : "⚡ Update the robot";
+  $("hint").textContent = flashing || on || $("result").className ? "" : navigator.serial ? "☝️ Connect the robot first (step 1)." : "This browser can't do it. Use Chrome or Edge on a computer.";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---------- "What gets copied" ----------
+
+function size(n) {
+  return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`;
+}
+
+// groups: [{ title, files: [{ path, size }] }] with robot paths. Keeps nothing from the last render.
+function renderFiles(groups) {
+  const list = $("files");
+  list.innerHTML = "";
+  rows.clear();
+  if (coreError) list.append(el("li", "bad", coreError));
+  for (const g of groups) {
+    list.append(el("li", "group", g.title));
+    for (const f of g.files) {
+      const li = el("li");
+      const state = el("div", "state");
+      li.append(el("span", "name", f.path), el("span", "size", size(f.size)), state);
+      list.append(li);
+      rows.set(f.path, state);
+    }
   }
 }
+
+function showPlan() {
+  if (flashing) return;
+  const groups = core ? [{ title: "🤖 The robot's main program", files: core }] : [];
+  for (const c of picked()) {
+    if (c.files) groups.push({ title: `${c.sketch.emoji} ${c.sketch.title}`, files: c.files.map((f) => ({ ...f, path: `sketches/${c.sketch.name}/${f.path}` })) });
+  }
+  renderFiles(groups);
+  const n = groups.reduce((sum, g) => sum + g.files.length, 0);
+  $("filesBox").querySelector("summary").textContent = n ? `What gets copied (${n} files)` : "What gets copied";
+}
+
+function setRow(path, cls, html) {
+  const state = rows.get(path);
+  if (!state) return;
+  state.className = "state " + cls;
+  state.innerHTML = html;
+}
+
+// ---------- connect ----------
 
 async function disconnect() {
   const t = transport;
@@ -193,8 +321,8 @@ async function connect() {
   try {
     port = await navigator.serial.requestPort($("allPorts").checked ? {} : { filters: USB_FILTERS });
   } catch (e) {
-    if (e.name !== "NotFoundError") result("❌ " + errorText(e));   // NotFoundError = picker closed
-    else if (!$("allPorts").checked) result("No robot picked.", "If it wasn't in the list, tick “Show all USB ports” and try again.");
+    if (e.name !== "NotFoundError") result("❌ " + errorText(e), "", "bad");   // NotFoundError = picker closed
+    else if (!$("allPorts").checked) result("No robot picked.", "If it wasn't in the list, tick “Show all USB ports” in step 1 and try again.");
     return;
   }
   try {
@@ -203,119 +331,99 @@ async function connect() {
     log(`connected (usb ${info.usbVendorId?.toString(16) ?? "?"}:${info.usbProductId?.toString(16) ?? "?"})`);
   } catch (e) {
     port = null;
-    result("❌ " + errorText(e), e.hint || "");
+    result("❌ " + errorText(e), e.hint || "", "bad");
     log(String(e.detail || e));
   }
   update();
 }
 
-function setRow(path, cls, html) {
-  const r = rows.get(path);
-  if (!r) return;
-  r.state.className = "state " + cls;
-  r.state.innerHTML = html;
+// ---------- copy ----------
+
+function progress(text, pct) {
+  $("progressText").textContent = text;
+  if (pct != null) $("bar").value = pct;
 }
 
-function onEvent(e) {
-  if (e.type === "stage") {
-    if (e.stage === "connect") $("statusText").textContent = "Stopping the robot's program…";
-    if (e.stage === "reset") $("statusText").textContent = "Restarting the robot…";
-    return;
-  }
-  $("statusText").textContent = `Flashing ${e.path}…`;
-  if (e.state === "writing") {
-    const pct = e.total ? Math.round((100 * e.written) / e.total) : 100;
-    setRow(e.path, "", `<progress max="100" value="${pct}"></progress> writing ${pct}%`);
-  } else if (e.state === "verifying") {
-    setRow(e.path, "", `<progress max="100" value="100"></progress> checking…`);
-  } else if (e.state === "ok") {
-    setRow(e.path, "ok", `✓ written and checked (${e.method})`);
-  } else if (e.state === "failed") {
-    setRow(e.path, "bad", `✗ ${e.error}`);
-  }
+// Core files + every picked extra, each path once. loadSketchFiles already includes the core files.
+async function loadPicked(extras) {
+  if (!extras.length) return loadBundle(base);
+  const sets = await Promise.all(extras.map((c) => loadSketchFiles(site, c.sketch.name)));
+  const byPath = new Map();
+  for (const f of sets.flat()) byPath.set(f.path, f);
+  return [...byPath.values()];
 }
 
-// Flashes files (from load()) and reports in #result. onEvent also gets every progress event.
-// Returns true if every file was written and checked.
-async function flashJob(load, { onEvent: extra = () => {}, done = "✅ Done, the robot is restarting into the menu." } = {}) {
+async function flash() {
+  if (!transport || flashing) return;
+  const extras = picked();
   flashing = true;
   update();
   result("");
-  let gone = false, ok = false;
+  $("progress").hidden = false;
+  progress("Downloading the files…", 0);
+  let gone = false;
   try {
     log("downloading files…");
-    const files = await load();
-    const results = await flashFiles(transport, files, { onEvent: (e) => { onEvent(e); extra(e); }, log });
+    const files = await loadPicked(extras);
+    const coreFiles = files.filter((f) => !f.path.startsWith("sketches/"));
+    renderFiles([{ title: "🤖 The robot's main program", files: coreFiles },
+      ...extras.map((c) => ({ title: `${c.sketch.emoji} ${c.sketch.title}`, files: files.filter((f) => f.path.startsWith(`sketches/${c.sketch.name}/`)) }))]);
+    for (const f of files) setRow(f.path, "", "waiting…");
+    const total = files.reduce((sum, f) => sum + f.data.length, 0) || 1;
+    const sent = new Map();
+    let count = 0;
+    const onEvent = (e) => {
+      if (e.type === "stage") {
+        if (e.stage === "connect") progress("Stopping the robot's program…");
+        if (e.stage === "reset") progress("Restarting the robot…", 100);
+        return;
+      }
+      if (e.state === "writing") {
+        if (e.written === 0) count++;
+        sent.set(e.path, e.written);
+        setRow(e.path, "", `copying ${e.total ? Math.round((100 * e.written) / e.total) : 100}%`);
+      } else if (e.state === "verifying") {
+        setRow(e.path, "", "checking…");
+      } else if (e.state === "ok") {
+        setRow(e.path, "ok", `✓ copied and checked (${e.method})`);
+      } else if (e.state === "failed") {
+        setRow(e.path, "bad", `✗ ${escapeHtml(e.error)}`);
+      }
+      let bytes = 0;
+      for (const n of sent.values()) bytes += n;
+      progress(`Copying ${count} of ${files.length}: ${e.path}`, Math.round((100 * bytes) / total));
+    };
+    const results = await flashFiles(transport, files, { onEvent, log });
     gone = true;   // machine.reset() drops the USB port; it comes back in a few seconds
     const bad = results.filter((r) => !r.ok);
-    ok = !bad.length;
-    if (ok) {
-      result(done, "Give it a few seconds. To flash again, press Connect again.");
+    if (!bad.length) {
+      let how = null;
+      if (extras.length) {
+        how = el("ul");
+        for (const c of extras) how.append(el("li", "", `${c.sketch.emoji} ${c.sketch.title}: on the robot, press ⬆ until the lights are ${colorName(c.sketch.color)}, then ✓.`));
+      }
+      result("✅ Done! The robot is restarting into its colour menu.", "Give it a few seconds. To copy again, press Connect again.", "ok", how);
     } else {
-      result(`⚠️ ${bad.length} of ${results.length} file${results.length > 1 ? "s" : ""} didn't flash. The robot is restarting anyway.`,
-        "See the ✗ in the list. Fix it, then connect again and flash.");
+      result(`⚠️ ${bad.length} of ${results.length} file${results.length > 1 ? "s" : ""} didn't copy. The robot is restarting anyway.`,
+        "See the ✗ under “What gets copied” in step 2. Then connect and try again.", "bad");
+      $("filesBox").open = true;
       for (const r of bad) log(`✗ ${r.path}: ${r.error}`);
     }
   } catch (e) {
     gone = true;
-    result("❌ " + errorText(e), e.hint || "");
+    result("❌ " + errorText(e), e.hint || "Check the cable, then connect and try again.", "bad");
     if (e.detail) log(String(e.detail));
   } finally {
     flashing = false;
+    $("progress").hidden = true;
     if (gone) await disconnect();
-    for (const r of rows.values()) if (!/ok|bad/.test(r.state.className)) { r.state.className = "state"; r.state.innerHTML = ""; }
+    for (const state of rows.values()) if (!/ok|bad/.test(state.className)) { state.className = "state"; state.innerHTML = ""; }
     update();
     pwa.idle();
   }
-  return ok;
 }
 
-async function flash() {
-  const picked = entries.filter((e) => rows.get(e.path).box.checked);
-  if (!picked.length || !transport) return;
-  for (const e of picked) setRow(e.path, "", "waiting…");
-  await flashJob(() => Promise.all(picked.map((e) => loadFile(base, e))));
-}
-
-async function flashSketch(card) {
-  const { sketch, state } = card;
-  if (!transport) return;
-  for (const c of cards) { c.state.textContent = ""; c.state.className = "cstate"; }
-  state.className = "cstate";
-  state.textContent = "Downloading…";
-  let total = 0, count = 0;
-  const ok = await flashJob(async () => {
-    const files = await loadSketchFiles(site, sketch.name);
-    total = files.length;
-    return files;
-  }, {
-    done: `✅ ${sketch.emoji} ${sketch.title} is on the robot. It's restarting into the menu.`,
-    onEvent: (e) => {
-      if (e.type === "stage") {
-        if (e.stage === "connect") state.textContent = "Stopping the robot's program…";
-        if (e.stage === "reset") state.textContent = "Restarting the robot…";
-      } else if (e.state === "writing" && e.written === 0) {
-        state.textContent = `Copying ${++count} of ${total}: ${e.path}`;
-      }
-    },
-  });
-  const light = colorName(sketch.color);
-  state.className = "cstate " + (ok ? "ok" : "bad");
-  state.textContent = ok
-    ? `✓ Installed. On the robot: press ⬆ until the lights are ${light}, then ✓.`
-    : "✗ Didn't finish. See the message below, then connect and try again.";
-}
-
-function colorName(rgb) {
-  return COLOR_NAMES[rgb.map((c) => (c ? 1 : 0)).join(",")] || "lit";
-}
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
+// ---------- load what the site has ----------
 
 async function loadSketches() {
   const box = $("sketches");
@@ -324,14 +432,16 @@ async function loadSketches() {
     list = await loadSketchList(site);
   } catch (e) {
     box.innerHTML = "";
-    box.append(el("p", "bad", `Couldn't load the sketches: ${e.message}`));
+    box.append(el("p", "bad", `Couldn't load the extras: ${e.message} You can still update the main program.`));
     return;
   }
   box.innerHTML = "";
-  if (!list.length) box.append(el("p", "notes", "No sketches yet."));
+  if (!list.length) box.append(el("p", "muted", "No extras yet."));
   for (const sketch of list) {
-    const card = el("div", "card");
+    const card = el("label", "card pick");
     card.dataset.sketch = sketch.name;
+    const input = el("input");
+    input.type = "checkbox";
     const body = el("div");
     const chips = el("div", "chips");
     const light = el("span", "chip");
@@ -339,49 +449,34 @@ async function loadSketches() {
     dot.style.background = `rgb(${sketch.color.map((c) => (c ? 255 : 0)).join(",")})`;
     light.append(dot, `menu light: ${colorName(sketch.color)}`);
     chips.append(light, ...(sketch.hardware || []).map((h) => el("span", "chip", h)));
-    body.append(el("h3", "", sketch.title), el("p", "", sketch.description), chips);
-    const go = el("button", "go", "⚡ Flash to robot");
-    const state = el("div", "cstate");
-    state.setAttribute("aria-live", "polite");
-    card.append(el("div", "emoji", sketch.emoji), body, go, state);
+    const tag = el("span", "tag", "＋ Add");
+    body.append(el("h3", "", sketch.title), el("p", "", sketch.description), chips, tag);
+    card.append(input, el("div", "emoji", sketch.emoji), body);
     box.append(card);
-    const c = { sketch, go, state };
-    go.addEventListener("click", () => flashSketch(c));
+    const c = { sketch, card, box: input, tag, files: null };
+    input.addEventListener("change", async () => {
+      update();
+      showPlan();
+      if (!c.files && input.checked) {   // only for the "What gets copied" list
+        try { c.files = await loadIndex(new URL(`sketches/${sketch.name}/`, site)); showPlan(); } catch { /* the flash will say */ }
+      }
+    });
     cards.push(c);
   }
   update();
 }
 
-async function loadList() {
+async function loadCore() {
   try {
-    entries = await loadIndex(base);
+    core = await loadIndex(base);
   } catch (e) {
-    $("files").innerHTML = `<li><span></span><span class="bad">Couldn't load the file list: ${e.message}</span></li>`;
-    return;
+    coreError = `Couldn't load the file list: ${e.message}`;
   }
-  $("files").innerHTML = "";
-  for (const e of entries) {
-    const li = document.createElement("li");
-    const box = document.createElement("input");
-    box.type = "checkbox"; box.checked = true; box.id = "f-" + e.path;
-    box.addEventListener("change", update);
-    const name = document.createElement("label");
-    name.className = "name"; name.htmlFor = box.id; name.textContent = e.path;
-    const size = document.createElement("span");
-    size.className = "size"; size.textContent = e.size < 1024 ? `${e.size} B` : `${(e.size / 1024).toFixed(1)} KB`;
-    const state = document.createElement("div");
-    state.className = "state";
-    li.append(box, name, size, state);
-    $("files").append(li);
-    rows.set(e.path, { li, box, state });
-  }
-  update();
+  showPlan();
 }
 
 $("connect").addEventListener("click", connect);
 $("flash").addEventListener("click", flash);
-$("all").addEventListener("click", () => { rows.forEach((r) => (r.box.checked = true)); update(); });
-$("none").addEventListener("click", () => { rows.forEach((r) => (r.box.checked = false)); update(); });
 addEventListener("beforeunload", (e) => { if (flashing) e.preventDefault(); });
 
 if (!navigator.serial) {
@@ -393,7 +488,7 @@ if (!navigator.serial) {
 }
 update();
 loadSketches();
-loadList();
+loadCore();
 </script>
 </body>
 </html>

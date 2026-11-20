@@ -29,10 +29,10 @@ mpr fs cp src/*.py : + reset                               # deploy src/ and res
 ## Flash from the browser (no terminal)
 **https://gabeduke.github.io/alvik/flash.html** (or the faint 🔧 in the corner of the remote).
 Chrome or Edge on a computer, robot plugged in by USB-C, Arduino Lab for MicroPython closed.
-Connect USB → either **⚡ Flash to robot** on a sketch card, or pick core files (all ticked) → ⚡ Flash.
+Three steps: 🔌 Connect USB → tap **＋ Add** on any sketches (extras) you want → **⚡ Update the robot**.
 Each file is written, checked (sha256 on the robot), then the robot restarts into the menu.
-It flashes the files from the last push to `main`. Flashing a sketch also writes all the core `src/` files,
-so the menu that runs sketches is always up to date.
+It flashes the files from the last push to `main`. Every flash writes all the core `src/` files (with or
+without sketches), so the menu that runs sketches is always up to date.
 It also rescues a stuck robot: Ctrl-C stops whatever is running first. iPad/Android can't do it.
 
 ## Handy commands
@@ -58,7 +58,8 @@ The robot speeds up gently and slows down as it gets close to things (bumper on)
 Installable app: Chrome → Install (or Android "Add to Home screen"). It works offline. Installed copies update themselves: the build stamps the commit into `sw.js`, and the page reloads on its own (`docs/pwa.js`), but never while the robot is connected or a flash is running.
 A joystick (push a little = slow, push a lot = fast) and big labelled buttons. The buttons are the same Bluetooth messages as Bluefruit; the joystick is its own message, so the robot needs the current `remote_control.py` (flash it with 🔧).
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
-Laptop keys: arrows push the joystick, 1-4 for the buttons.
+The 🕹️ button in the header changes how you drive, and the choice is remembered on that device: **One hand** (joystick), **Two hands** (left thumb speed, right thumb steering: good on a tablet) or **Mouse** (click the ball to grab it, click again or leave the pad to let go).
+Laptop keys: arrows or WASD drive, 1-4 for the buttons, Esc stops.
 ```sh
 scripts/build_site.sh && python3 -m http.server -d _site 8000   # then open http://localhost:8000
 node --test tests/*.test.mjs                                     # flasher + sketch build tests (Node 20+, no installs)
@@ -83,7 +84,7 @@ More than 6 entries? They come in pages of 6. Page 1 is steady; on page 2 the li
 
 ## Sketches
 A sketch is a small program that shows up as an extra colour in the robot's menu. Pick one on the
-[flash page](https://gabeduke.github.io/alvik/flash.html) and press **⚡ Flash to robot**.
+[flash page](https://gabeduke.github.io/alvik/flash.html) (**＋ Add**) and press **⚡ Update the robot**.
 
 | | Sketch | Uses |
 |---|---|---|
