@@ -402,7 +402,11 @@ class TimedLink:
     @property
     def events(self):
         while self.timeline and self.timeline[0][0] <= CLOCK.now:
-            self._events.append(self.timeline.pop(0)[1])
+            event = self.timeline.pop(0)[1]
+            if event == "lost":            # the phone went away (and a new one may connect)
+                self.lost = True
+            else:
+                self._events.append(event)
         return self._events
 
     def start(self): pass
@@ -482,6 +486,11 @@ class RemoteDriving(RobotTest):
         self.assertEqual(robot.colour_at(2500)[0], RED)
         self.assertEqual(robot.colour_at(3800)[0], WHITE)
         self.assertGreater(self.at(robot, 3800)[0], 0, "drives on when the way is clear")
+
+    def test_a_new_phone_starts_with_turbo_off(self):
+        robot, rc = self.drive([(0, (2, True)), (100, (5, True)), (1500, "lost"), (1600, (5, True))])
+        self.assertEqual(self.at(robot, 1400)[0], rc.TURBO_SPEED)
+        self.assertEqual(self.at(robot, 3900)[0], rc.SPEED, "turbo is off again after reconnecting")
 
     def test_bumper_does_not_stop_reversing(self):
         robot, rc = self.drive([(0, (6, True))], distance=lambda t: (5,) * 5)

@@ -29,7 +29,7 @@
   header { width: 100%; max-width: 900px; display: flex; align-items: center; gap: 12px; }
   h1 { margin: 0; font-size: 28px; flex: 1; }
   #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  @media (max-width: 560px) { #statusText, #toolsText, #layoutText, #title { display: none; } #layout { font-size: 18px; padding: 8px 10px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
+  @media (max-width: 560px) { #statusText, #toolsText, #layout span, #title { display: none; } #layout button { font-size: 18px; padding: 5px 8px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
   #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; }
   #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
   #connect {
@@ -124,14 +124,13 @@
     body[data-layout="two"] button.big.action { height: min(15vw, 28vh, 150px); font-size: min(2.2vw, 20px); }
     body[data-layout="two"] .action .emoji { font-size: min(6vw, 12vh, 52px); }
   }
-  /* mouse layout: a bigger pad; click to grab the ball, click again to let go */
-  body[data-layout="mouse"] .stick { --size: min(80vw, 62vh, 460px); cursor: pointer; }
-  #hint { color: var(--muted); font-size: 15px; text-align: center; min-height: 1.2em; }
-  #hint:empty { display: none; }
-  #layout {
-    font: inherit; font-size: 15px; font-weight: 700; color: var(--muted); background: var(--panel);
-    border: 0; border-radius: 12px; padding: 10px 12px; white-space: nowrap; cursor: pointer;
+  /* one hand / two hands switch: both shown, the one in use is lit */
+  #layout { display: flex; background: var(--panel); border-radius: 12px; padding: 3px; gap: 2px; }
+  #layout button {
+    font: inherit; font-size: 15px; font-weight: 700; color: var(--muted); background: none;
+    border: 0; border-radius: 9px; padding: 7px 10px; white-space: nowrap; cursor: pointer;
   }
+  #layout button[aria-pressed="true"] { background: var(--up); color: #fff; }
   footer { color: var(--muted); font-size: 14px; text-align: center; }
   #tools {
     font-size: 15px; font-weight: 700; text-decoration: none; color: var(--muted);
@@ -143,7 +142,10 @@
 <header>
   <h1>🤖<span id="title"> Alvik</span></h1>
   <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
-  <button id="layout" title="Change how you drive: one hand, two hands or mouse"><span id="layoutIcon">🕹️</span><span id="layoutText"> One hand</span></button>
+  <div id="layout" role="group" aria-label="How you drive">
+    <button data-layout="stick" title="One joystick">🕹️<span> One hand</span></button>
+    <button data-layout="two" title="Left thumb speed, right thumb steering">🙌<span> Two hands</span></button>
+  </div>
   <a id="tools" href="flash.html" title="Grown-ups: put new code on the robot over USB">🔧<span id="toolsText"> Update robot</span></a>
   <button id="connect">Connect</button>
 </header>
@@ -169,8 +171,6 @@
     <button class="big action" data-b="4"><span class="emoji">🛡️</span>Bumper<span class="state" id="bumperState">on</span></button>
   </div>
 </main>
-
-<div id="hint"></div>
 
 <footer>On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</footer>
 
@@ -215,8 +215,8 @@ function send(button, pressed) {
 }
 
 // ---------- driving ----------
-// Three layouts, picked with the button in the header and remembered on this device:
-//   stick = one joystick · two = left thumb speed + right thumb steering · mouse = click to grab, click to let go
+// Two layouts, picked with the switch in the header and remembered on this device:
+//   stick = one joystick · two = left thumb speed + right thumb steering
 // Arrow keys / WASD work in all of them.
 const stickEl = $("stick"), knob = $("knob"), throttleEl = $("throttle"), steerEl = $("steer");
 const controls = [stickEl, throttleEl, steerEl];
@@ -225,14 +225,9 @@ const ARROWS = {
   ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
   KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0],
 };
-const LAYOUTS = {
-  stick: ["🕹️", "One hand", ""],
-  two: ["🙌", "Two hands", ""],
-  mouse: ["🖱️", "Mouse", "Click the ball to grab it. Click again to let go."],
-};
+const LAYOUTS = ["stick", "two"];
 let layout = "stick";
 const touch = { x: 0, y: 0 };           // what the on-screen controls say, each -1..1
-let grabbed = false;                    // mouse layout: the ball follows the mouse
 const arrowsDown = new Set();
 const dragResets = [];
 let want = [0, 0], sent = [0, 0], sentAt = 0, stickBusy = false;
@@ -283,7 +278,7 @@ function readSteer(e) {
   touch.x = clamp((e.clientX - (r.left + r.width / 2)) / ((r.width - r.height) / 2));
 }
 
-// hold and drag (finger, pen, or mouse outside the mouse layout); letting go springs back
+// hold and drag; letting go springs back
 function drag(el, read, clear) {
   let id = null;
   const end = (e) => {
@@ -292,7 +287,6 @@ function drag(el, read, clear) {
   };
   el.addEventListener("pointerdown", (e) => {
     if (!rx || id !== null) return;
-    if (el === stickEl && layout === "mouse" && e.pointerType === "mouse") return;   // click-to-grab, below
     e.preventDefault();
     el.setPointerCapture?.(e.pointerId);
     id = e.pointerId; el.classList.add("active"); read(e); updateStick();
@@ -306,22 +300,7 @@ drag(stickEl, readStick, () => { touch.x = 0; touch.y = 0; });
 drag(throttleEl, readThrottle, () => { touch.y = 0; });
 drag(steerEl, readSteer, () => { touch.x = 0; });
 
-// mouse layout: click grabs the ball (no holding the button), click again or leave the pad to let go
-stickEl.addEventListener("pointerdown", (e) => {
-  if (!rx || layout !== "mouse" || e.pointerType !== "mouse") return;
-  e.preventDefault();
-  grabbed = !grabbed;
-  stickEl.classList.toggle("active", grabbed);
-  if (grabbed) readStick(e); else { touch.x = 0; touch.y = 0; }
-  updateStick();
-});
-stickEl.addEventListener("pointermove", (e) => {
-  if (grabbed && e.pointerType === "mouse") { readStick(e); updateStick(); }
-});
-stickEl.addEventListener("pointerleave", () => { if (grabbed) centreStick(); });
-
 function centreStick() {
-  grabbed = false;
   touch.x = 0; touch.y = 0;
   arrowsDown.clear();
   dragResets.forEach((f) => f());
@@ -329,20 +308,17 @@ function centreStick() {
 }
 
 function setLayout(name) {
-  if (!LAYOUTS[name]) name = "stick";
+  if (!LAYOUTS.includes(name)) name = "stick";
   centreStick();
   layout = name;
   document.body.dataset.layout = name;
-  $("layoutIcon").textContent = LAYOUTS[name][0];
-  $("layoutText").textContent = " " + LAYOUTS[name][1];
-  $("hint").textContent = LAYOUTS[name][2];
+  document.querySelectorAll("#layout button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.layout === name)));
   try { localStorage.setItem("alvik-layout", name); } catch {}
   updateStick();
 }
-$("layout").addEventListener("click", () => {
-  const names = Object.keys(LAYOUTS);
-  setLayout(names[(names.indexOf(layout) + 1) % names.length]);
-});
+document.querySelectorAll("#layout button").forEach((b) =>
+  b.addEventListener("click", () => setLayout(b.dataset.layout)));
 addEventListener("resize", updateStick);
 
 function setConnected(on) {

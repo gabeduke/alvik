@@ -194,6 +194,8 @@ def run_remote(alvik):
             _link.lost = False
             held.clear()
             stick = (0, 0)
+            turbo = False              # the next phone starts fresh: turbo off, bumper on
+            bumper = True              # (the web remote shows them that way when it connects)
             dance.stop()
             dancing = False
             alvik.brake()

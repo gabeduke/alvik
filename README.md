@@ -58,7 +58,7 @@ The robot speeds up gently and slows down as it gets close to things (bumper on)
 Installable app: Chrome → Install (or Android "Add to Home screen"). It works offline. Installed copies update themselves: the build stamps the commit into `sw.js`, and the page reloads on its own (`docs/pwa.js`), but never while the robot is connected or a flash is running.
 A joystick (push a little = slow, push a lot = fast) and big labelled buttons. The buttons are the same Bluetooth messages as Bluefruit; the joystick is its own message, so the robot needs the current `remote_control.py` (flash it with 🔧).
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
-The 🕹️ button in the header changes how you drive, and the choice is remembered on that device: **One hand** (joystick), **Two hands** (left thumb speed, right thumb steering: good on a tablet) or **Mouse** (click the ball to grab it, click again or leave the pad to let go).
+The 🕹️ / 🙌 switch in the header changes how you drive, and the choice is remembered on that device: **One hand** (joystick) or **Two hands** (left thumb speed, right thumb steering: good on a tablet).
 Laptop keys: arrows or WASD drive, 1-4 for the buttons, Esc stops.
 ```sh
 scripts/build_site.sh && python3 -m http.server -d _site 8000   # then open http://localhost:8000
