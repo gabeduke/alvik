@@ -4,7 +4,7 @@ Arduino Alvik robot (MicroPython, ESP32) for the kids, plus a web remote. Backlo
 
 ## Layout
 - `src/` – files that go on the robot (`main.py` → `demo.py` menu; `remote_control.py` = purple "phone remote" mode).
-- `docs/` – the web remote, served by GitHub Pages (branch `main`, folder `/docs`) at https://gabeduke.github.io/alvik/. Push to `main` = deploy (~1 min). Pages sends `cache-control: max-age=600`.
+- `docs/` – the web remote (installable PWA: `manifest.webmanifest`, `sw.js`), deployed by `.github/workflows/pages.yml` (Pages source = GitHub Actions; it stamps the commit SHA into `sw.js`) at https://gabeduke.github.io/alvik/. Push to `main` = deploy (~1 min). Pages sends `cache-control: max-age=600`.
 
 ## Robot over USB
 - `.venv/bin/mpremote` (venv from README). Port is usually `/dev/cu.usbmodem1234561`; it disappears when the robot is unplugged.

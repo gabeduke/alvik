@@ -36,7 +36,8 @@ If several boards are plugged in: `mpr connect /dev/cu.usbmodemXXXX ...`
 3. Arrows drive · 1 lights · 2 turbo · 3 disco dance · 4 bumper on/off. ✗ on the robot returns to the menu.
 
 ## Web remote (`docs/index.html`)
-**Live: https://gabeduke.github.io/alvik/** (GitHub Pages, redeploys on every push to `main`)
+**Live: https://gabeduke.github.io/alvik/** (GitHub Pages via `.github/workflows/pages.yml`, redeploys on every push to `main`)
+Installable app: Chrome → Install (or Android "Add to Home screen"). It works offline. Installed copies update themselves: the workflow stamps the commit into `docs/sw.js`, and the page reloads on its own, but only when the robot isn't connected.
 Big labelled buttons in the browser, same Bluetooth messages as Bluefruit, so nothing changes on the robot.
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
 Laptop keys: arrows drive, 1-4 for the buttons.

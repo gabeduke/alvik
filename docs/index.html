@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#1b1630">
 <title>Alvik Remote</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alvik">
 <style>
   :root {
     --bg: #1b1630; --panel: #2a2347; --text: #fff; --muted: #b8b0d8;
@@ -68,6 +74,17 @@
   }
   .action.dancing { animation: disco .6s linear infinite; }
   footer { color: var(--muted); font-size: 14px; text-align: center; }
+  #toast {
+    position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px; max-width: calc(100% - 32px);
+    background: var(--panel); color: var(--text); border-radius: 16px; padding: 10px 12px 10px 18px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.45); font-size: 17px;
+  }
+  #toast[hidden] { display: none; }
+  #toast button {
+    font: inherit; font-weight: 700; border: 0; border-radius: 12px;
+    padding: 8px 14px; background: var(--up); color: #fff; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -97,6 +114,8 @@
 
 <footer>On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</footer>
 
+<div id="toast" role="status" hidden><span id="toastText">✨ The remote was updated.</span><button id="reload">Reload</button></div>
+
 <script>
 // Talks to remote_control.py on the robot using the same Nordic UART "Control Pad"
 // packets the Bluefruit Connect app sends:  '!' 'B' <button '1'-'8'> <'1' down / '0' up> <checksum>
@@ -110,6 +129,7 @@ let device = null, rx = null;
 let queue = Promise.resolve();          // BLE writes must not overlap
 let turbo = false, bumper = true;       // robot starts each session with turbo off, bumper on
 const held = new Map();                 // pointerId / key -> button number
+let updated = false, reloadTimer = 0;   // a new version took over (see sw.js section below)
 
 function packet(button, pressed) {
   const bytes = [0x21, 0x42, 48 + button, pressed ? 0x31 : 0x30];
@@ -126,6 +146,7 @@ function send(button, pressed) {
 }
 
 function setConnected(on) {
+  if (!on) reloadIfUpdated();
   $("dot").classList.toggle("on", on);
   $("statusText").textContent = on ? "Connected" : "Not connected";
   $("connect").textContent = on ? "Disconnect" : "Connect";
@@ -229,6 +250,47 @@ if (!navigator.bluetooth) {
   $("msg").innerHTML = ios
     ? "This browser can't talk to Bluetooth robots. On iPad, open this page in the free <b>Bluefy</b> app instead."
     : "This browser can't talk to Bluetooth robots. Try <b>Chrome</b> or <b>Edge</b>.";
+}
+
+// ---- Installable app + self-updating (sw.js) ----
+// A new deploy changes sw.js; the new worker takes over and fires controllerchange. Then we show a
+// toast and reload a few seconds later, but never while the robot is connected: reloading drops
+// Bluetooth and the robot brakes. In that case the reload waits until it disconnects (or the button).
+function reloadIfUpdated() {
+  if (!updated || reloadTimer) return;
+  $("toastText").textContent = "✨ The remote was updated. Reloading…";
+  reloadTimer = setTimeout(() => {
+    if (device?.gatt?.connected) {   // connected during the countdown: wait for the disconnect
+      reloadTimer = 0;
+      $("toastText").textContent = "✨ The remote was updated. It will reload after you disconnect.";
+      return;
+    }
+    location.reload();
+  }, 4000);
+}
+
+$("reload").addEventListener("click", () => location.reload());
+
+if ("serviceWorker" in navigator) {
+  let reg;
+  let hadController = !!navigator.serviceWorker.controller;   // none at first install = not an update
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) { hadController = true; return; }
+    updated = true;
+    $("toast").hidden = false;
+    if (device?.gatt?.connected) {
+      $("toastText").textContent = "✨ The remote was updated. It will reload after you disconnect.";
+    } else {
+      reloadIfUpdated();
+    }
+  });
+  navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" })
+    .then((r) => (reg = r)).catch((e) => console.warn("service worker", e));
+
+  const check = () => reg?.update().catch(() => {});
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && check());
+  addEventListener("online", check);
+  setInterval(check, 30 * 60 * 1000);
 }
 </script>
 </body>
