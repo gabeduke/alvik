@@ -1,5 +1,6 @@
-# Deploys docs/ (the web remote) to GitHub Pages, stamping the commit into the service worker
-# so installed copies update themselves. Pages source must be "GitHub Actions".
+# Builds _site/ (docs/ plus the robot files from src/, see scripts/build_site.sh) and deploys it to
+# GitHub Pages. The commit is stamped into the service worker so installed copies update themselves.
+# Pages source must be "GitHub Actions".
 name: Pages
 
 on:
@@ -24,13 +25,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Stamp build id into the service worker
-        run: |
-          sed -i "s/__BUILD__/${GITHUB_SHA::7}/" docs/sw.js
-          grep -q "${GITHUB_SHA::7}" docs/sw.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the flasher
+        run: node --test tests/*.test.mjs
+      - name: Build _site (docs/ + robot files, build id stamped into sw.js)
+        run: BUILD=${GITHUB_SHA::7} scripts/build_site.sh
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

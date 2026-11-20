@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>Alvik Flash</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #1b1630; --panel: #2a2347; --text: #fff; --muted: #b8b0d8;
+    --up: #3fa9f5; --lights: #ffd23f; --turbo: #ff6b35; --disco: #c86bfa; --bumper: #3ddc84; --bad: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+    padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+    line-height: 1.4;
+  }
+  header, section, #result, details { width: 100%; max-width: 720px; }
+  header { display: flex; align-items: center; gap: 12px; }
+  h1 { margin: 0; font-size: 28px; flex: 1; }
+  h2 { margin: 0 0 10px; font-size: 20px; }
+  a { color: var(--up); }
+  header a { font-size: 18px; text-decoration: none; }
+  section { background: var(--panel); border-radius: 18px; padding: 16px 18px; }
+  .notes { color: var(--muted); font-size: 16px; }
+  .notes ul { margin: 0; padding-left: 20px; }
+  .notes li + li { margin-top: 4px; }
+  .notes b { color: var(--text); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-size: 18px; font-weight: 700; border: 0; border-radius: 14px;
+    padding: 10px 18px; background: var(--up); color: #fff; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,.35);
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  button.quiet { background: transparent; color: var(--muted); box-shadow: none; padding: 6px 10px; font-size: 15px; }
+  #flash { background: var(--bumper); color: var(--bg); font-size: 22px; padding: 12px 28px; }
+  #status { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; flex: none; }
+  #dot.on { background: var(--bumper); box-shadow: 0 0 10px var(--bumper); }
+  #dot.busy { background: var(--lights); box-shadow: 0 0 10px var(--lights); }
+  label.small { color: var(--muted); font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  #files { list-style: none; margin: 0 0 12px; padding: 0; }
+  #files li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px; padding: 6px 0; }
+  #files li + li { border-top: 1px solid rgba(255,255,255,.08); }
+  #files input { width: 20px; height: 20px; accent-color: var(--bumper); }
+  #files .name { font-family: ui-monospace, Menlo, monospace; font-size: 16px; overflow-wrap: anywhere; }
+  #files .size { color: var(--muted); font-size: 14px; }
+  #files .state { grid-column: 2 / 4; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; min-height: 0; }
+  #files .state:empty { display: none; }
+  #files .ok { color: var(--bumper); }
+  #files .bad { color: var(--bad); }
+  progress { width: 140px; height: 8px; accent-color: var(--up); }
+  #result { font-size: 19px; text-align: center; }
+  #result:empty { display: none; }
+  #result .hint { display: block; color: var(--muted); font-size: 16px; margin-top: 4px; }
+  #unsupported { background: #4a2030; color: var(--text); font-size: 18px; }
+  details { color: var(--muted); font-size: 14px; }
+  summary { cursor: pointer; }
+  #log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; background: #120e22; border-radius: 12px; padding: 10px; margin-top: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔧 Flash the robot</h1>
+  <a href="./">← Remote</a>
+</header>
+
+<section id="unsupported" hidden>
+  This browser can't talk to USB devices. Open this page in <b>Chrome</b> or <b>Edge</b> on a computer
+  (Mac, Windows, Linux or Chromebook). iPad, iPhone and Android can't flash the robot.
+</section>
+
+<section class="notes">
+  <h2>Before you start</h2>
+  <ul>
+    <li>This copies the robot code from this website onto the Alvik over a <b>USB-C cable</b>, then restarts it into the colour menu.</li>
+    <li><b>Chrome or Edge on a computer</b> only. iPad and Android phones can't do this.</li>
+    <li>Close <b>Arduino Lab for MicroPython</b> (and Thonny, mpremote or any serial monitor) first: only one program can use the USB port.</li>
+    <li><b>“Port busy” or “couldn't open”?</b> Close the other program, unplug the cable, plug it back in and press Connect again.</li>
+    <li>It works even if the robot is stuck: it stops whatever is running first.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>1. Connect</h2>
+  <div class="row">
+    <button id="connect">🔌 Connect USB</button>
+    <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
+  </div>
+  <label class="small" style="margin-top:10px"><input type="checkbox" id="allPorts"> Robot not in the list? Show all USB ports</label>
+</section>
+
+<section>
+  <h2>2. Pick the files</h2>
+  <ul id="files"><li><span></span><span class="size">Loading the file list…</span></li></ul>
+  <div class="row">
+    <button id="flash" disabled>⚡ Flash</button>
+    <button class="quiet" id="all">All</button>
+    <button class="quiet" id="none">None</button>
+  </div>
+</section>
+
+<div id="result" role="status"></div>
+
+<details>
+  <summary>Log</summary>
+  <div id="log"></div>
+</details>
+
+<script type="module">
+import { initPwa } from "./pwa.js";
+import { loadIndex, loadFile, openSerial, flashFiles, FlashError, USB_FILTERS } from "./flasher.js";
+
+const $ = (id) => document.getElementById(id);
+const base = new URL("robot/", location.href);
+let entries = [];          // from robot/index.json
+let port = null, transport = null, flashing = false;
+const rows = new Map();    // path -> { li, box, state }
+
+const pwa = initPwa({ isBusy: () => flashing, name: "This page", whenBusy: "It will reload when flashing is done." });
+
+function log(text) {
+  const el = $("log");
+  el.textContent += text.endsWith("\n") ? text : text + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+function result(html, hint = "") {
+  $("result").innerHTML = html + (hint ? `<span class="hint">${hint}</span>` : "");
+}
+
+function errorText(e) {
+  return e instanceof FlashError ? e.message : `Something went wrong: ${e.message || e}`;
+}
+
+function update() {
+  const on = !!transport;
+  $("dot").className = flashing ? "busy" : on ? "on" : "";
+  $("statusText").textContent = flashing ? "Flashing…" : on ? "Connected" : "Not connected";
+  $("connect").textContent = on ? "Disconnect" : "🔌 Connect USB";
+  $("connect").disabled = flashing || !navigator.serial;
+  const picked = [...rows.values()].filter((r) => r.box.checked).length;
+  $("flash").disabled = flashing || !on || picked === 0;
+  $("flash").textContent = picked && picked < rows.size ? `⚡ Flash ${picked} file${picked > 1 ? "s" : ""}` : "⚡ Flash";
+  for (const r of rows.values()) r.box.disabled = flashing;
+  $("all").disabled = $("none").disabled = flashing;
+}
+
+async function disconnect() {
+  const t = transport;
+  transport = null; port = null;
+  update();
+  if (t) await t.close();
+}
+
+async function connect() {
+  if (transport) { await disconnect(); result(""); return; }
+  result("");
+  try {
+    port = await navigator.serial.requestPort($("allPorts").checked ? {} : { filters: USB_FILTERS });
+  } catch (e) {
+    if (e.name !== "NotFoundError") result("❌ " + errorText(e));   // NotFoundError = picker closed
+    else if (!$("allPorts").checked) result("No robot picked.", "If it wasn't in the list, tick “Show all USB ports” and try again.");
+    return;
+  }
+  try {
+    transport = await openSerial(port);
+    const info = port.getInfo?.() || {};
+    log(`connected (usb ${info.usbVendorId?.toString(16) ?? "?"}:${info.usbProductId?.toString(16) ?? "?"})`);
+  } catch (e) {
+    port = null;
+    result("❌ " + errorText(e), e.hint || "");
+    log(String(e.detail || e));
+  }
+  update();
+}
+
+function setRow(path, cls, html) {
+  const r = rows.get(path);
+  if (!r) return;
+  r.state.className = "state " + cls;
+  r.state.innerHTML = html;
+}
+
+function onEvent(e) {
+  if (e.type === "stage") {
+    if (e.stage === "connect") $("statusText").textContent = "Stopping the robot's program…";
+    if (e.stage === "reset") $("statusText").textContent = "Restarting the robot…";
+    return;
+  }
+  $("statusText").textContent = `Flashing ${e.path}…`;
+  if (e.state === "writing") {
+    const pct = e.total ? Math.round((100 * e.written) / e.total) : 100;
+    setRow(e.path, "", `<progress max="100" value="${pct}"></progress> writing ${pct}%`);
+  } else if (e.state === "verifying") {
+    setRow(e.path, "", `<progress max="100" value="100"></progress> checking…`);
+  } else if (e.state === "ok") {
+    setRow(e.path, "ok", `✓ written and checked (${e.method})`);
+  } else if (e.state === "failed") {
+    setRow(e.path, "bad", `✗ ${e.error}`);
+  }
+}
+
+async function flash() {
+  const picked = entries.filter((e) => rows.get(e.path).box.checked);
+  if (!picked.length || !transport) return;
+  flashing = true;
+  update();
+  result("");
+  for (const e of picked) setRow(e.path, "", "waiting…");
+  let gone = false;
+  try {
+    log("downloading files…");
+    const files = await Promise.all(picked.map((e) => loadFile(base, e)));
+    const results = await flashFiles(transport, files, { onEvent, log });
+    gone = true;   // machine.reset() drops the USB port; it comes back in a few seconds
+    const bad = results.filter((r) => !r.ok);
+    if (!bad.length) {
+      result("✅ Done, the robot is restarting into the menu.",
+        "Give it a few seconds. To flash again, press Connect again.");
+    } else {
+      result(`⚠️ ${bad.length} of ${results.length} file${results.length > 1 ? "s" : ""} didn't flash. The robot is restarting anyway.`,
+        "See the ✗ above. Fix it, then connect again and flash.");
+    }
+  } catch (e) {
+    gone = true;
+    result("❌ " + errorText(e), e.hint || "");
+    if (e.detail) log(String(e.detail));
+    for (const p of picked) if (!rows.get(p.path).state.className.match(/ok|bad/)) setRow(p.path, "", "");
+  } finally {
+    flashing = false;
+    if (gone) await disconnect();
+    update();
+    pwa.idle();
+  }
+}
+
+async function loadList() {
+  try {
+    entries = await loadIndex(base);
+  } catch (e) {
+    $("files").innerHTML = `<li><span></span><span class="bad">Couldn't load the file list: ${e.message}</span></li>`;
+    return;
+  }
+  $("files").innerHTML = "";
+  for (const e of entries) {
+    const li = document.createElement("li");
+    const box = document.createElement("input");
+    box.type = "checkbox"; box.checked = true; box.id = "f-" + e.path;
+    box.addEventListener("change", update);
+    const name = document.createElement("label");
+    name.className = "name"; name.htmlFor = box.id; name.textContent = e.path;
+    const size = document.createElement("span");
+    size.className = "size"; size.textContent = e.size < 1024 ? `${e.size} B` : `${(e.size / 1024).toFixed(1)} KB`;
+    const state = document.createElement("div");
+    state.className = "state";
+    li.append(box, name, size, state);
+    $("files").append(li);
+    rows.set(e.path, { li, box, state });
+  }
+  update();
+}
+
+$("connect").addEventListener("click", connect);
+$("flash").addEventListener("click", flash);
+$("all").addEventListener("click", () => { rows.forEach((r) => (r.box.checked = true)); update(); });
+$("none").addEventListener("click", () => { rows.forEach((r) => (r.box.checked = false)); update(); });
+addEventListener("beforeunload", (e) => { if (flashing) e.preventDefault(); });
+
+if (!navigator.serial) {
+  $("unsupported").hidden = false;
+} else {
+  navigator.serial.addEventListener("disconnect", (e) => {
+    if (e.target === port && !flashing) { disconnect(); result("The robot was unplugged."); }
+  });
+}
+update();
+loadList();
+</script>
+</body>
+</html>
