@@ -5,3 +5,4 @@ stock-backup/*
 .DS_Store
 _site/
 .playwright-mcp/
+*.blend1
