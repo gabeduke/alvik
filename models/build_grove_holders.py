@@ -27,6 +27,7 @@ SOCKET = 2.0            # how deep the studs go in
 FLOOR = 1.4             # solid layer over the studs = floor of the tray
 TUBE_OUT = 6.3          # tube between four studs
 TUBE_IN = 3.9           # leaves a 1.2 wall, three passes of a 0.4 nozzle
+RIB = 1.0               # ribs joining the tubes to the walls, in the gaps between stud rows
 CHAMFER = 0.3           # bottom edges of the sockets lean back: room for a squashed first layer
 
 # ---------- Grove boards, mm ----------
@@ -157,20 +158,27 @@ def brick_base(nx, ny):
     sk = SKIRT - FIT
     cuts = [box(-hx + sk, hx - sk, -hy + sk, hy - sk, -1, SOCKET),
             flared(hx - sk, hy - sk, -CHAMFER, CHAMFER, 2 * CHAMFER)]
-    adds = []
+    adds, holes = [], []
     r = TUBE_OUT / 2 - FIT
-    for i in range(nx - 1):
-        for j in range(ny - 1):
-            x, y = (i - (nx - 2) / 2) * P, (j - (ny - 2) / 2) * P
-            t = turned(x, y, [(r - CHAMFER, 0), (r, CHAMFER), (r, SOCKET + 0.2)])
-            adds.append(cut(t, [cyl(x, y, TUBE_IN / 2, -1, SOCKET + 0.1)]))
-    return box(-hx, hx, -hy, hy, 0, ZF), cuts, adds
+    txs = [(i - (nx - 2) / 2) * P for i in range(nx - 1)]
+    tys = [(j - (ny - 2) / 2) * P for j in range(ny - 1)]
+    for x in txs:
+        for y in tys:
+            adds.append(turned(x, y, [(r - CHAMFER, 0), (r, CHAMFER), (r, SOCKET + 0.2)]))
+            holes.append(cyl(x, y, TUBE_IN / 2, -1, SOCKET + 0.1))
+    # ribs between the stud rows tie every tube to the walls, so the first layer is one piece
+    # that holds the bed (loose little rings came off and the print failed)
+    for x in txs:
+        adds.append(box(x - RIB / 2, x + RIB / 2, -hy + 0.5, hy - 0.5, 0, SOCKET + 0.2))
+    for y in tys:
+        adds.append(box(-hx + 0.5, hx - 0.5, y - RIB / 2, y + RIB / 2, 0, SOCKET + 0.2))
+    return box(-hx, hx, -hy, hy, 0, ZF), cuts, adds, holes
 
 
 def fit_test():
     """A 2 x 2 brick bottom with two studs on top: print this first to check FIT."""
-    body, cuts, adds = brick_base(2, 2)
-    body = add(cut(body, cuts), adds)
+    body, cuts, adds, holes = brick_base(2, 2)
+    body = cut(add(cut(body, cuts), adds), holes)
     return add(body, [cyl(-4, -4, STUD_D / 2, ZF - 0.1, ZF + STUD_H), cyl(4, 4, STUD_D / 2, ZF - 0.1, ZF + STUD_H)])
 
 
@@ -182,7 +190,8 @@ def cradle(length, ears, arms):
     ny = 3 if length <= 20 else 6
     Y = ny * P / 2 - GAP
     yi = length / 2 + SLACK
-    body, cuts, adds = brick_base(3, ny)
+    body, cuts, adds, holes = brick_base(3, ny)
+    clips = []
     walls = [box(s * XI, s * X, -Y, Y, ZF - 0.1, ZT) for s in (-1, 1)]
     walls.append(box(-X, X, yi, Y, ZF - 0.1, ZT))                      # far end
     walls.append(box(-X, X, -Y, -yi, ZF - 0.1, ZS))                    # socket end, low for the plug
@@ -202,14 +211,14 @@ def cradle(length, ears, arms):
         cuts.append(box(s * (XI - 0.1), s * (X + 1), y_root, end, ZS - 1.0, ZS - 0.4))     # slot under
         cuts.append(box(s * (XI - 0.1), s * (X + 1), y_free, end, ZS - 1.0, ZT + 1))       # slit at the end
         cuts.append(box(s * (XI + ARM_T), s * (X + 1), y_root, end, ZS - 1.0, ZT + 1))     # make it thin
-        adds.append(wedge([(s * (XI + 0.2), ZB), (s * (XI - BARB), ZB), (s * (XI + 0.2), ZT)],
+        clips.append(wedge([(s * (XI + 0.2), ZB), (s * (XI - BARB), ZB), (s * (XI + 0.2), ZT)],
                           y_free - d * 0.3, y_free - d * 2.8))
     if length > 20:                         # the end walls are thick enough to hold a lid's tabs
         for sx, sy in TABS:
             xc = sx * TAB_X
             cuts.append(box(xc - 2.2, xc + 2.2, sy * (Y - 1.3), sy * (Y + 1), ZF + 0.4, ZT + 1))
             cuts.append(box(xc - 2.2, xc + 2.2, sy * (Y - 2.0), sy * (Y - 1.2), ZF + 0.4, ZF + 1.7))
-    return add(cut(add(body, walls), cuts), adds)
+    return add(cut(add(cut(add(body, walls), cuts), adds), holes), clips)
 
 
 # ---------- a lid for the 20 x 40 tray ----------

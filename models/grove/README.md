@@ -51,6 +51,9 @@ hold the lid over the board before snapping it on.
   let the slicer turn it (in Bambu Studio, skip "Auto orient"; "Arrange" is fine). No supports. 0.2 mm layers or finer, 3 walls.
 - The hollow underside prints without supports: the gaps the roof has to bridge are about 3 mm. The
   socket edges lean back 0.3 mm at the bed so a squashed first layer does not pinch the studs.
+- The trays touch the bed only along their rim, tubes and ribs. Wash the plate first, and add a 5 mm brim
+  (Bambu Studio: Others, Brim type "Outer brim only", so none ends up in the stud sockets). A first print
+  without ribs or brim came loose and failed.
 - PETG is kinder to the clips than PLA; PLA should do if the board is not taken out often.
 - Print `fit_test_2x2.stl` first and press it onto the plate, and a LEGO brick onto its two studs.
   Too tight or too loose: change `FIT` at the top of the script by 0.05 (+ is looser), build, print again.
