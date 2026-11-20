@@ -4,7 +4,8 @@
 //
 //   '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
 //     heading   int16, tenths of a degree, -1800..1799; turning left counts up
-//     distance  cm to the closest thing in front, 0..254; 255 = nothing seen
+//     distance  cm to what the robot's bumper sees in front (an average, without the floor),
+//               0..254; 255 = nothing
 //     lights    bit 0-2 = left LED red, green, blue; bit 3-5 = right LED
 //     speed     int8, 0.2 cm/s steps (forward is positive)
 //     turn      int8, 3 deg/s steps (left is positive)
@@ -15,8 +16,8 @@
 // just doesn't send it):
 //
 //   '!' 'S' <left> <half left> <middle> <half right> <right> <roll> <pitch> <battery> <checksum>
-//     five distances in cm, as the sensor sees them from left to right; 255 = nothing seen
-//     (the robot leaves out the floor, which the sensor also sees: Zone.see in remote_control.py)
+//     five distances in cm, just as the sensor reads them from left to right (floor and blips
+//     included: the page shows them as a point cloud); 255 = nothing seen
 //     roll, pitch   int8, whole degrees, as the robot's IMU reports them
 //     battery       0..100 percent; 255 = not known
 //

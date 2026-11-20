@@ -507,20 +507,23 @@ class RemoteDriving(RobotTest):
         self.assertIn(0, after[:after.index(-rc.SPEED)])
 
     def test_bumper_slows_then_stops_at_once_and_lights_red(self):
-        def distance(t):                      # a wall coming closer, then gone
-            d = 100 if t < 1000 else 21 if t < 2000 else 5 if t < 3000 else 100
+        def distance(t):                      # a wall 55 cm ahead that the robot drives up to; at 14 s it is taken away
+            d = 55 - FakeAlvik.current.travelled(t) if t < 14000 else 100
             return (None, d, d, d, None)
-        robot, rc = self.drive([(0, (5, True))], until=3900, distance=distance)
+        robot, rc = self.drive([(0, (5, True))], until=16000, distance=distance)
         self.assertEqual(self.at(robot, 900)[0], rc.SPEED)
-        self.assertAlmostEqual(self.at(robot, 1500)[0], rc.SPEED / 2)
-        self.assertEqual(self.at(robot, 2040)[0], 0, "stops at once")
-        slowing = [rgb for t, side, rgb in robot.leds if side == "L" and 1000 < t < 2000]
+        half = next(t for t, l, a in robot.drives if 55 - robot.travelled(t) <= 21)
+        self.assertAlmostEqual(self.at(robot, half)[0], rc.SPEED / 2, delta=0.6)
+        stop = next(t for t, l, a in robot.drives if t > 1000 and l == 0)
+        self.assertGreaterEqual(self.at(robot, stop - 30)[0], 2, "stops at once, no slowing to a halt")
+        self.assertTrue(10.5 < 55 - robot.travelled(stop) <= rc.BUMPER_CM, 55 - robot.travelled(stop))
+        slowing = [rgb for t, side, rgb in robot.leds if side == "L" and half < t < half + 2000]
         self.assertEqual(set(slowing), {RED, WHITE}, "blinks red while slowing down")
-        stopped = [(t, rgb) for t, side, rgb in robot.leds if side == "L" and 2040 < t < 3000]
+        stopped = [(t, rgb) for t, side, rgb in robot.leds if side == "L" and stop + 100 < t < stop + 2100]
         self.assertEqual({rgb for t, rgb in stopped}, {RED, OFF}, "flashes red when stopped")
         self.assertGreater(len(stopped), 1.5 * len(slowing), "and faster")
-        self.assertEqual(robot.colour_at(3800)[0], WHITE)
-        self.assertGreater(self.at(robot, 3800)[0], 0, "drives on when the way is clear")
+        self.assertEqual(robot.colour_at(15800)[0], WHITE)
+        self.assertGreater(self.at(robot, 15800)[0], 0, "drives on when the way is clear")
 
     def test_a_new_phone_starts_with_turbo_off(self):
         robot, rc = self.drive([(0, (2, True)), (100, (5, True)), (1500, "lost"), (1600, (5, True))])
@@ -551,12 +554,12 @@ class RemoteDriving(RobotTest):
         robot, rc = self.drive([(0, (5, True))], until=30000, distance=distance)
         seen = [(70 - robot.travelled(t), l) for t, l, a in robot.drives if t > 1000]
         self.assertTrue(all(l == rc.SPEED for wall, l in seen if wall > rc.SLOW_CM + 1), "full speed until 30 cm")
-        self.assertTrue(all(l < rc.SPEED for wall, l in seen if wall < rc.SLOW_CM - 1), "then always slower")
-        for cm in (25, 21, 19, 17, 15, 13):   # no letting go where the floor shows (14 to 20 cm)
+        self.assertTrue(all(l < rc.SPEED for wall, l in seen if wall < rc.SLOW_CM - 4), "then always slower")
+        for cm in (25, 21, 19, 17, 15, 13):   # no letting go where the floor shows (13 to 21 cm)
             wall, l = min(seen, key=lambda x: abs(x[0] - cm))
-            self.assertAlmostEqual(l, max(2, rc.SPEED * (wall - rc.BUMPER_CM) / (rc.SLOW_CM - rc.BUMPER_CM)), delta=0.2, msg=cm)
+            self.assertAlmostEqual(l, max(2, rc.SPEED * (wall - rc.BUMPER_CM) / (rc.SLOW_CM - rc.BUMPER_CM)), delta=0.6, msg=cm)
         self.assertEqual(seen[-1][1], 0, "stopped")
-        self.assertTrue(rc.BUMPER_CM - 0.5 < seen[-1][0] <= rc.BUMPER_CM, seen[-1][0])
+        self.assertTrue(10.5 < seen[-1][0] <= rc.BUMPER_CM, seen[-1][0])
 
     def test_turning_away_from_a_wall_onto_open_floor_lets_go(self):
         def distance(t):                      # a wall 26 cm ahead; at 2 s the robot has turned away from it
@@ -585,7 +588,7 @@ def read_telemetry(pkt):
 
 
 class FloorOrThing(RobotTest):
-    """Zone.see: one zone of the distance sensor, with the floor taken out."""
+    """Zone.see: one zone of the distance sensor, with the floor and the blips taken out."""
 
     def zone(self):
         import remote_control as rc
@@ -610,31 +613,34 @@ class FloorOrThing(RobotTest):
         while d > 9:
             got.append((d, zone.see(d + (0.4 if int(d * 4) % 2 else -0.4), 0.25)))
             d -= 0.25
-        self.assertTrue(all(seen is not None for d, seen in got if d < rc.SLOW_CM - 1), [g for g in got if g[1] is None])
+        self.assertTrue(all(seen is not None for d, seen in got if d < rc.SLOW_CM - 2), [g for g in got if g[1] is None])
 
-    def test_closer_than_the_bumper_distance_counts_at_once(self):
+    def test_closer_than_the_bumper_distance_is_never_the_floor(self):
         zone, rc = self.zone()
-        self.assertEqual(zone.see(11), 11)
+        self.assertEqual([zone.see(11) for _ in range(rc.SURE)], [None] * (rc.SURE - 1) + [11])
         self.assertEqual(zone.see(12.5), 12.5, "and backing off a little it is still that thing")
+        zone.floor = 11                        # even if the floor were thought to show there
+        self.assertEqual([zone.see(10.5, 0.3) for _ in range(40)][-1], 10.5, "and driving at it does not make it the floor")
 
-    def test_one_odd_reading_is_not_a_thing_but_two_are(self):
-        zone, rc = self.zone()
-        self.assertEqual([zone.see(d) for d in (17, 25, 17, 17)], [None] * 4)
-        self.assertEqual([zone.see(d) for d in (25, 25, 24.8)], [None, 25, 24.8])
+    def test_a_blip_is_not_a_thing(self):
+        zone, rc = self.zone()                 # the real sensor: a zone drops to another reading for a moment
+        self.assertEqual([zone.see(d) for d in (120, 25, 25, 25, 120, 13.5, 13.4, 120)], [120, None, None, None, 120, None, None, 120])
+        self.assertEqual([zone.see(25) for _ in range(rc.SURE + 1)], [None] * (rc.SURE - 1) + [25, 25], "but it is once it stays")
 
     def test_a_thing_that_comes_no_closer_as_we_drive_at_it_is_the_floor(self):
         zone, rc = self.zone()                 # a thick carpet, or a nose-up robot: the floor shows at 23 cm
         seen = [zone.see(23 + (i % 3) * 0.3, 0.2) for i in range(60)]
-        self.assertEqual(seen[1], 23.3, "taken for a thing at first")
-        gone = seen.index(None, 1)
+        self.assertEqual(seen[rc.SURE - 1], 23, "taken for a thing at first")
+        gone = seen.index(None, rc.SURE)
         self.assertLessEqual(gone * 0.2, rc.FLOOR_PROOF_CM + 0.5, "let go after driving this far")
         self.assertEqual(set(seen[gone:]), {None}, "and it stays the floor")
         self.assertIsNone(zone.see(22.5), "standing still too")
-        self.assertEqual([zone.see(d, 0.2) for d in (19.5, 19, 18.5)], [None, 19, 18.5], "something nearer than that floor is a thing")
+        self.assertEqual([zone.see(d, 0.2) for d in (18.5, 18, 17.5, 17, 16.5)], [None, None, None, 17, 16.5],
+                         "something nearer than that floor is a thing")
 
     def test_a_wobble_in_the_floor_reading_does_not_stick(self):
-        zone, rc = self.zone()                 # the real robot's left zone: 15 to 20.6 cm on a still floor
-        self.assertEqual([zone.see(d) for d in (17, 20.4, 20.6, 19.8, 17.2, 16)], [None, None, 20.6, None, None, None])
+        zone, rc = self.zone()                 # the floor's reading strays out of its usual range for a moment
+        self.assertEqual([zone.see(d) for d in (17, 21.4, 21.6, 21.3, 21.2, 17.2, 16)], [None, None, None, None, 21.2, None, None])
 
     def test_standing_still_nothing_is_decided(self):
         zone, rc = self.zone()
@@ -646,11 +652,11 @@ class FloorOrThing(RobotTest):
         while d > 13:
             seen.append(zone.see(d, 0.25))
             d -= 0.12                          # half as fast as we drive
-        self.assertNotIn(None, seen[1:])
+        self.assertNotIn(None, seen[rc.SURE - 1:])
 
     def test_looking_somewhere_else_it_is_the_floor_again(self):
         zone, rc = self.zone()
-        for d in (25, 24.5, 24):               # a wall
+        for d in (25, 24.8, 24.6, 24.4, 24.2):  # a wall
             zone.see(d, 0.25)
         self.assertIsNone(zone.see(17.2, 0.25), "the wall slid out of view: a jump down to the floor")
         zone, rc = self.zone()
@@ -661,8 +667,48 @@ class FloorOrThing(RobotTest):
         seen = [zone.see(18.5, 0, turned=3) for _ in range(4)]
         self.assertEqual(seen[:2], [18.5, 18.5], "not yet")
         self.assertIsNone(seen[-1], "but after turning away it is")
-        self.assertEqual([zone.see(d, 0, turned=3) for d in (26, 26, 26, 26, 26)], [None, 26, 26, 26, 26],
-                         "turning with a real thing in view: it stays")
+        for _ in range(rc.SURE):
+            zone.see(26)
+        self.assertEqual([zone.see(26, 0, turned=3) for _ in range(6)], [26] * 6, "turning with a real thing in view: it stays")
+
+
+class WhatIsAhead(RobotTest):
+    """Bumper.look: one distance from the middle three zones, an average and not the closest."""
+
+    def settle(self, distances, looks=40):
+        import remote_control as rc
+        eyes = rc.Bumper()
+        return [eyes.look(distances) for _ in range(looks)][-1], rc, eyes
+
+    def test_nothing_or_far_things_or_the_floor_is_nothing(self):
+        for distances in ((None,) * 5, (140, 115, 108, 101, 83), (16.5, 16.8, 17.1, 17.4, 180), (5, 200, 200, 200, 5)):
+            self.assertIsNone(self.settle(distances)[0], distances)
+
+    def test_a_wall_across_all_three_counts_in_full(self):
+        ahead, rc, eyes = self.settle((None, 25, 25, 25, None))
+        self.assertAlmostEqual(ahead, 25, delta=0.1)
+        self.assertEqual(rc.bumper_limit(self.settle((None, 8, 9, 10, None))[0], rc.SPEED), 0)
+
+    def test_something_in_one_zone_only_nudges_it(self):
+        ahead, rc, eyes = self.settle((None, 200, 200, 24, None))      # a bookshelf off to one side
+        self.assertAlmostEqual(ahead, (30 + 30 + 24) / 3, delta=0.1)
+        self.assertGreater(rc.bumper_limit(ahead, rc.SPEED), rc.SPEED * 0.85)
+        ahead, rc, eyes = self.settle((None, 200, 6, 200, None))       # a chair leg dead ahead
+        self.assertGreater(rc.bumper_limit(ahead, rc.SPEED), 0, "slows, but does not stop for it")
+
+    def test_the_real_sensors_blips_change_nothing(self):
+        import remote_control as rc
+        eyes = rc.Bumper()                     # as read off the real robot: far things, with dips to the floor and half-way blends
+        readings = [(142, 115, 108, 101, 83)] * 30 + [(142, 115, 64.2, 13.5, 83)] * 3 + [(142, 115, 108, 101, 83)] * 10 \
+            + [(140, 16.5, 58.9, 101, 83)] * 2 + [(142, 115, 108, 101, 83)] * 10
+        self.assertEqual({eyes.look(r) for r in readings}, {None})
+
+    def test_it_is_smoothed_not_jumped_to(self):
+        ahead, rc, eyes = self.settle((None, 26, 26, 26, None))
+        steps = [eyes.look((None, 22.5, 22.5, 22.5, None)) for _ in range(14)]
+        self.assertGreater(steps[0], 24.5, "one look later it has only started to move")
+        self.assertEqual(steps, sorted(steps, reverse=True))
+        self.assertAlmostEqual(steps[-1], 22.5, delta=0.1)
 
 
 class Telemetry(RobotTest):
@@ -705,7 +751,7 @@ class Telemetry(RobotTest):
         self.assertTrue(23 <= len(times) <= 30, len(times))
         self.assertTrue(all(b - a >= rc.TELEMETRY_MS for a, b in zip(times, times[1:])))
         t = self.told(rc, 1500)
-        self.assertEqual((t["heading"], t["distance"], t["speed"], t["turn"]), (12.3, 62, rc.SPEED, 0))
+        self.assertEqual((t["heading"], t["distance"], t["speed"], t["turn"]), (12.3, None, rc.SPEED, 0))
         self.assertEqual((t["left"], t["right"]), (WHITE, WHITE))
         self.assertEqual((t["turbo"], t["bumper"], t["blocked"], t["dancing"]), (False, True, False, False))
         self.assertEqual(self.told(rc, 2900)["heading"], 40, "heading wraps to -180..180")

@@ -2,7 +2,8 @@
 // and the shade under a line sensor.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM } from "../docs/sensing.js";
+import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM,
+  newCloud, cloudAdd, cloudAlpha, CLOUD_MS, ROW_FRONT } from "../docs/sensing.js";
 
 /** The heat once it has settled on these readings. */
 function settled(zones) {
@@ -91,6 +92,26 @@ test("a wall that shows up fades in where it is, and one that goes fades out", (
   const gone = settled([null, null, null, null, null]);
   assert.deepEqual(gone.seen, [0, 0, 0, 0, 0]);
   assert.equal(heatAt(settled([SEE_CM + 1, 50, 200, 60, 41]), 2).alpha, 0, "further than 40 cm is not drawn");
+});
+
+test("point cloud: readings become points that fade, and only the newest are kept", () => {
+  const cloud = newCloud(6);
+  cloudAdd(cloud, 1, ROW_FRONT, 17, 1000);
+  cloudAdd(cloud, 2, ROW_FRONT, null, 1000);            // nothing seen: no point
+  cloudAdd(cloud, 3, ROW_FRONT, SEE_CM + 60, 1000);     // too far for the picture: no point
+  assert.equal(cloud.points.length, 1);
+  const [p] = cloud.points;
+  assert.equal(cloudAlpha(p, 1000), 1);
+  assert.ok(cloudAlpha(p, 1000 + CLOUD_MS / 2) > 0.4 && cloudAlpha(p, 1000 + CLOUD_MS / 2) < 0.6, "half gone half way");
+  assert.equal(cloudAlpha(p, 1000 + CLOUD_MS), 0);
+  assert.equal(cloudAlpha(p, 900), 0, "a clock that jumped back shows nothing odd");
+  for (let i = 0; i < 8; i++) cloudAdd(cloud, i % 5, ROW_FRONT, 20 + i, 2000 + i);
+  assert.equal(cloud.points.length, 6);
+  assert.deepEqual(cloud.points.map((q) => q.cm).sort(), [22, 23, 24, 25, 26, 27], "the oldest made way");
+  const far = newCloud();
+  cloudAdd(far, 2, ROW_FRONT, 39, 0);
+  cloudAdd(far, 2, ROW_FRONT, 25, 0);
+  assert.ok(cloudAlpha(far.points[0], 0) < cloudAlpha(far.points[1], 0), "far points are fainter, like the heat");
 });
 
 test("picked up: the further the floor, the higher the robot is drawn", () => {

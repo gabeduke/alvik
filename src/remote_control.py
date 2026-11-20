@@ -31,11 +31,13 @@ TURN = 90            # deg/s
 BUMPER_CM = 12       # stop when something is closer than this in front
 SLOW_CM = 30         # start slowing down when something is closer than this
 FLOOR_CM = 17        # with nothing ahead the distance sensor sees the floor itself about this far away
-FLOOR_SLACK_CM = 3   # a reading this close to where the floor shows is taken for the floor
+FLOOR_SLACK_CM = 4   # a reading this close to where the floor shows is taken for the floor
 FLOOR_PROOF_CM = 4   # drive this far at a thing: if it came no closer, it was the floor all along
 CLOSER_CM = 1.5      # a reading has to drop by this much to count as "came closer" (less is noise)
 VIEW_JUMP_CM = 4     # a reading that changes by more than this at once is something else coming into view
 VIEW_TURN_DEG = 8    # and so is turning this far
+SURE = 4             # a thing has to show in this many readings in a row to count (fewer is a blip)
+BUMPER_SMOOTH = 0.3  # how much of the way the bumper's distance moves to the newest reading, each time round
 ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
@@ -112,16 +114,9 @@ def ramp(now, want, step_up, step_down):
     return now + step_up if want > now else now - step_up
 
 
-def front_distance(distances):
-    """Closest thing straight ahead in cm (the middle three of the five readings), or None."""
-    front = [x for x in distances[1:4] if x is not None]
-    return min(front) if front else None
-
-
-def bumper_limit(distances, speed):
-    """Fastest we may go forward given what's in front: full speed beyond SLOW_CM,
-    slower as it gets closer, 0 inside BUMPER_CM."""
-    d = front_distance(distances)
+def bumper_limit(d, speed):
+    """Fastest we may go forward with something d cm ahead (Bumper.look; None = nothing):
+    full speed beyond SLOW_CM, slower as it gets closer, 0 inside BUMPER_CM."""
     if d is None:
         return speed
     if d < BUMPER_CM:
@@ -143,12 +138,14 @@ class Zone:
         (a wall the robot drives up to passes through where the floor shows and must stay a wall).
     And a thing that comes no closer while the robot drives FLOOR_PROOF_CM at it was the floor
     after all (a ramp, a carpet, a nose-up robot): from then on that is where the floor shows.
-    Closer than BUMPER_CM is always a real thing: the floor never looks that close."""
+    Closer than BUMPER_CM is always a real thing: the floor never looks that close.
+    The sensor also blips: a zone that mostly sees something far away drops to the floor's
+    reading for a moment. So a thing only counts once it has shown SURE times in a row."""
 
     def __init__(self):
         self.floor = FLOOR_CM   # where the floor shows in this zone
         self.last = None        # the reading before this one
-        self.sure = 0           # readings in a row that showed a thing: it counts from 2 (1 can be a blip)
+        self.sure = 0           # readings in a row that showed a thing: it counts from SURE
         self.real = False       # have we watched it come closer?
         self.mark = 0           # the thing's distance when it last came closer
         self.driven = 0         # cm driven at it since then
@@ -162,10 +159,7 @@ class Zone:
         if d is None or d >= SLOW_CM:
             self.sure = 0
             return d
-        if d < BUMPER_CM:
-            self.sure, self.real, self.mark, self.driven, self.turned = 2, True, d, 0, 0
-            return d
-        near_floor = abs(d - self.floor) <= FLOOR_SLACK_CM
+        near_floor = d >= BUMPER_CM and abs(d - self.floor) <= FLOOR_SLACK_CM
         if self.sure:
             self.driven += moved
             self.turned += abs(turned)
@@ -174,19 +168,45 @@ class Zone:
             elif d < self.mark - CLOSER_CM:
                 self.real = self.real or moved > 0                 # it comes closer as we drive: a real thing
                 self.mark, self.driven = d, 0
-            elif self.driven >= FLOOR_PROOF_CM:
+            elif self.driven >= FLOOR_PROOF_CM and d >= BUMPER_CM:
                 self.floor, self.sure = d, 0                       # it does not: that is the floor here
                 return None
+            if d < BUMPER_CM:
+                self.real = True
             if near_floor and not self.real:                       # a wobble in the floor's reading
                 self.sure = 0
                 return None
         elif near_floor:
             return None
         else:
-            self.real, self.mark, self.driven, self.turned = False, d, 0, 0
-        if self.sure < 2:
+            self.real, self.mark, self.driven, self.turned = d < BUMPER_CM, d, 0, 0
+        if self.sure < SURE:
             self.sure += 1
-        return d if self.sure >= 2 else None
+        return d if self.sure >= SURE else None
+
+
+class Bumper:
+    """What is in the way, as one distance in cm.
+
+    It is the average of the middle three zones, not the closest of them: each zone has the floor
+    taken out (Zone) and counts as SLOW_CM when it is clear, and the average is smoothed over
+    about a tenth of a second. So one zone's odd reading, or something off to one side, only
+    nudges it, and a wall across all three counts in full. (Something narrow, like a chair leg,
+    fills one zone: the robot slows a little and bumps into it.)"""
+
+    def __init__(self):
+        self.zones = [Zone(), Zone(), Zone()]
+        self.ahead = SLOW_CM
+
+    def look(self, distances, moved=0, turned=0):
+        """distances = the sensor's five readings, left to right; moved = cm driven forward and
+        turned = degrees turned since the last look. Returns cm to what is ahead, or None."""
+        total = 0
+        for zone, d in zip(self.zones, distances[1:4]):
+            d = zone.see(d, moved, turned)
+            total += SLOW_CM if d is None or d > SLOW_CM else d
+        self.ahead += (total / 3 - self.ahead) * BUMPER_SMOOTH
+        return self.ahead if self.ahead < SLOW_CM - 1 else None
 
 
 def _int8(v, scale):
@@ -204,7 +224,8 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
     """What the robot is doing, for the 3D robot on the web remote (docs/telemetry.js reads it).
     10 bytes:  '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
       heading   int16, tenths of a degree, -1800..1799; turning left counts up
-      distance  cm to the closest thing in front, 0..254; 255 = nothing seen
+      distance  cm to what the bumper sees in front (Bumper.look: an average, without the
+                floor), 0..254; 255 = nothing
       lights    bit 0-2 = left LED red, green, blue; bit 3-5 = right LED
       speed     int8, 0.2 cm/s steps (forward is positive)
       turn      int8, 3 deg/s steps (left is positive)
@@ -224,8 +245,8 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
 def sensor_packet(distances, roll, pitch, battery):
     """The sensors in front, sent right after telemetry_packet (docs/telemetry.js reads it).
     11 bytes:  '!' 'S' <5 distances> <roll> <pitch> <battery> <checksum>
-      distances  cm, the five zones from left to right, 0..254; 255 = nothing seen. The floor
-                 itself does not count as something seen (Zone.see takes it out)
+      distances  cm, the five zones from left to right just as the sensor reads them (floor
+                 and blips included: the page shows them as a point cloud), 0..254; 255 = nothing seen
       roll, pitch  int8, whole degrees, as the IMU reports them
       battery    0..100 percent; 255 = not known"""
     d = [_cm(x) for x in tuple(distances)[:5]]
@@ -350,7 +371,7 @@ def run_remote(alvik):
     linear = angular = 0  # what the wheels are doing now (ramps towards what's asked for)
     telemetry = False     # the web page asks for it; the Bluefruit app never does
     told_at = 0
-    zones = [Zone() for _ in range(5)]     # the distance sensor's five zones, each without the floor
+    eyes = Bumper()                        # what the distance sensor makes of the way ahead
     last = ticks_ms()
 
     lit = _lights(alvik, (1, 1, 0))   # yellow: waiting for a phone (lit = the colour showing)
@@ -409,9 +430,9 @@ def run_remote(alvik):
         if stick != (0, 0) and ticks_diff(now, stick_at) > STICK_TIMEOUT_MS:
             stick = (0, 0)                 # the page stopped talking: don't keep driving
 
-        # what is in front, left to right, with the floor taken out (linear and angular are
-        # still what the wheels did since the last look)
-        things = [zone.see(d, linear * dt, angular * dt) for zone, d in zip(zones, alvik.get_distance())]
+        # what is ahead (linear and angular are still what the wheels did since the last look)
+        seen = alvik.get_distance()
+        ahead = eyes.look(seen, linear * dt, angular * dt)
 
         # work out what's being asked for this tick
         move = dance.step() if dancing else None
@@ -436,7 +457,7 @@ def run_remote(alvik):
         level = 0
         if bumper and (linear > 0 or want_linear > 0):
             top = TURBO_SPEED if turbo else SPEED
-            limit = bumper_limit(things, top)
+            limit = bumper_limit(ahead, top)
             if linear > limit:
                 linear = limit             # right away, no ramp
             level = 2 if limit == 0 else 1 if limit < top else 0
@@ -459,10 +480,10 @@ def run_remote(alvik):
             told_at = now
             left, right = dance.lights if move else (lit, lit)
             _link.send(telemetry_packet(
-                alvik.get_pose()[2], front_distance(things), left, right,
+                alvik.get_pose()[2], ahead, left, right,
                 linear, angular, turbo, bumper, blocked, bool(move)))
             roll, pitch, _ = alvik.get_orientation()
-            _link.send(sensor_packet(things, roll, pitch, alvik.get_battery_charge()))
+            _link.send(sensor_packet(seen, roll, pitch, alvik.get_battery_charge()))
             _link.send(under_packet(alvik.get_line_sensors(), floor_colour(alvik),
                                     alvik.get_distance_bottom(), alvik.get_distance_top()))
         sleep_ms(30)

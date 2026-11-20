@@ -1,13 +1,13 @@
 // The 3D Alvik on the remote: a live copy of the real robot, fed by telemetry (telemetry.js).
-// It turns with the robot's heading, its wheels spin, its light strips take the LED colours, and
-// what the distance sensor sees glows in front of it like a heat map. It leans and rises when the
-// real one is tipped or picked up, the floor under it takes the colour the robot sees there, and
+// It turns with the robot's heading, its wheels spin, its light strips take the LED colours. What
+// the distance sensor reads hovers in front of it as a cloud of points, and what the bumper makes
+// of that glows as heat. It leans and rises when the real one is tipped or picked up, the floor under it takes the colour the robot sees there, and
 // three dots at its nose show what the line sensors see. (How a reading becomes a colour or a
 // height is in sensing.js.)
 //
 //   const twin = await createTwin(canvas);      // loads three.js and models/alvik.glb
 //   twin.update(t);                             // t = a parsed telemetry packet
-//   twin.sensors(s);                            // s = a parsed sensors packet (five distances, tilt)
+//   twin.sensors(s);                            // s = a parsed sensors packet (five raw distances, tilt)
 //   twin.under(u);                              // u = a parsed under-the-robot packet (lines, floor colour, height)
 //   twin.reset();                               // robot went away: stand still, lights off
 //   twin.recentre();                            // "the robot is pointing away from me right now"
@@ -18,7 +18,8 @@
 // Draws only when something changes, so an idle page costs nothing.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/loaders/GLTFLoader.js";
-import { SLOW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep } from "./sensing.js";
+import { SLOW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep,
+  newCloud, cloudAdd, cloudAlpha, ROW_BOTTOM, ROW_FRONT, ROW_TOP } from "./sensing.js";
 
 const WHEEL_R = 0.017, TRACK = 0.0895;          // metres: wheel radius, distance between the wheels
 const NOSE = 0.048;                             // front face, from the middle
@@ -32,6 +33,8 @@ const LIFT_M = 0.06;                            // metres in the picture for a r
 const HEAT_COLS = ZONES * 8 + 1;
 const HEAT_ROWS = [{ y: 0.0012, foot: false, a: 0 }, { y: 0.0012, foot: true, a: 0.85 }, { y: 0.026, foot: true, a: 0.7 }, { y: 0.058, foot: true, a: 0 }];
 const EYE_X = 0.013, EYE_Z = 0.036;             // metres: the line sensors, apart and ahead of the middle
+const CLOUD_Y = { [ROW_BOTTOM]: 0.004, [ROW_FRONT]: 0.024, [ROW_TOP]: 0.047 };   // metres up: where each row's points hover
+const CLOUD_DOT = 0.014;                        // metres across
 const BG = 0x1b1630, FLOOR = 0x2a2347, GRID = 0x4a3f7c, CELL = 0.05;
 const AZIMUTH = 0.42, ELEVATION = 0.6;          // camera: radians round to the robot's right, and up
 
@@ -88,9 +91,9 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     lamp.intensity = on ? 0.06 : 0;
   }
 
-  // What the distance sensor sees: one soft sheet of heat across its five zones. It lies on the
-  // floor from the robot's nose out to where the thing is, and stands up there, fading out at the
-  // top. Distance and colour are blended from zone to zone and eased over time (sensing.js).
+  // What the bumper makes of the distance sensor (the robot's averaged "something is this far
+  // ahead"): one soft sheet of heat across the middle zones. It lies on the floor from the robot's
+  // nose out to where the thing is, and stands up there, fading out at the top (sensing.js).
   const heatGeo = new THREE.BufferGeometry();
   const heatPos = new THREE.BufferAttribute(new Float32Array(HEAT_COLS * HEAT_ROWS.length * 3), 3);
   const heatCol = new THREE.BufferAttribute(new Float32Array(HEAT_COLS * HEAT_ROWS.length * 4), 4);
@@ -107,6 +110,29 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
   heatMesh.frustumCulled = false;               // its shape changes all the time
   heatMesh.renderOrder = 3;                     // over the patch of floor and the shadow
   robot.add(heatMesh);
+
+  // What the distance sensor really reads: a cloud of points, one for every reading, that fade
+  // after a moment. Floor bounce and blips are all there; the robot's bumper sorts them out.
+  const cloud = newCloud();
+  const cloudPos = new THREE.BufferAttribute(new Float32Array(cloud.size * 3), 3);
+  const cloudCol = new THREE.BufferAttribute(new Float32Array(cloud.size * 4), 4);
+  const cloudGeo = new THREE.BufferGeometry();
+  cloudGeo.setAttribute("position", cloudPos);
+  cloudGeo.setAttribute("color", cloudCol);
+  const dot = document.createElement("canvas");
+  dot.width = dot.height = 64;
+  const pen = dot.getContext("2d"), glow = pen.createRadialGradient(32, 32, 0, 32, 32, 32);
+  glow.addColorStop(0, "rgba(255,255,255,1)");
+  glow.addColorStop(0.35, "rgba(255,255,255,.75)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  pen.fillStyle = glow;
+  pen.fillRect(0, 0, 64, 64);
+  const cloudMesh = new THREE.Points(cloudGeo, new THREE.PointsMaterial({
+    size: CLOUD_DOT, map: new THREE.CanvasTexture(dot), vertexColors: true, transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  cloudMesh.frustumCulled = false;
+  cloudMesh.renderOrder = 4;
+  robot.add(cloudMesh);
 
   // Under the robot. A round patch of floor in the colour the robot sees there (with a clear edge,
   // so it is not taken for heat), and its shadow, which stays on the floor when the robot is picked up.
@@ -155,7 +181,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
   const head = newCompass();                    // heading in degrees, as drawn (sensing.js keeps the lag down)
   let latest = 0, zero = null;                  // the robot's own heading from the last packet, and what counts as 0
   let speed = 0, turn = 0;                      // cm/s, deg/s
-  let zones = [null, null, null, null, null], zoned = false, blocked = false;   // cm, left to right
+  let zones = [null, null, null, null, null], blocked = false;   // cm, left to right: what the bumper reacts to
   const heat = newHeat();                       // the heat as drawn: it follows zones
   let lights = [[0, 0, 0], [0, 0, 0]];
   let roll = 0, pitch = 0, rollNow = 0, pitchNow = 0;      // degrees: latest from the robot, and drawn
@@ -210,6 +236,22 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     heatPos.needsUpdate = heatCol.needsUpdate = true;
   }
 
+  // The point cloud, at the same scale as the heat. Each point fades with age.
+  function showCloud(now) {
+    const gap = gapMax();
+    tint.setRGB(0.56, 0.84, 1, THREE.SRGBColorSpace);
+    for (let i = 0; i < cloud.size; i++) {
+      const p = cloud.points[i], alpha = p ? cloudAlpha(p, now) : 0;
+      if (alpha) {
+        const r = NOSE + 0.006 + gap * Math.min(p.cm, SLOW_CM) / SLOW_CM;
+        const a = THREE.MathUtils.degToRad(((ZONES - 1) / 2 - p.u) * ZONE_DEG);
+        cloudPos.setXYZ(i, Math.sin(a) * r, CLOUD_Y[p.row] + p.up, Math.cos(a) * r);
+      }
+      cloudCol.setXYZW(i, tint.r, tint.g, tint.b, alpha);
+    }
+    cloudPos.needsUpdate = cloudCol.needsUpdate = true;
+  }
+
   // Under the robot: the patch of floor in the colour it sees, the shadow, and the line sensors.
   function showUnder(dt) {
     const want = ground ? 1 : 0;
@@ -256,6 +298,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       + 0.02 * Math.min(1, (Math.abs(rollNow) + Math.abs(pitchNow)) / 30);     // and clear of the floor as it tips
     const heating = easeHeat(heat, zones, dt);
     showHeat();
+    showCloud(now);                             // (it fades in steps, as packets come in: no need to keep drawing for it)
     const colouring = showUnder(dt);
     // stopped by the bumper: the strips flash red, like the real lights
     const dark = blocked && Math.floor(now / FLASH_MS) % 2;
@@ -276,6 +319,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
   new ResizeObserver(place).observe(canvas);
   [0, 1].forEach((i) => setLed(i, [0, 0, 0]));
   showHeat();
+  showCloud(0);
   showUnder(0);
   place();
 
@@ -288,22 +332,24 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       speed = t.speed; turn = t.turn;
       blocked = t.blocked;
       lights = [t.left, t.right];
-      if (!zoned) zones = [null, t.distance, t.distance, t.distance, null];   // older robot code: one distance
+      zones = [null, t.distance, t.distance, t.distance, null];   // what the bumper sees ahead: the middle three zones
       newsAt = performance.now();
       wake();
     },
     /** The robot went away. The next one starts facing away from you again. */
     reset() {
       zero = null; head.target = head.shown = 0; speed = turn = 0; blocked = false;
-      zones = [null, null, null, null, null]; zoned = false;
+      zones = [null, null, null, null, null];
+      cloud.points.length = 0; cloud.next = 0;
       lights = [[0, 0, 0], [0, 0, 0]];
       roll = pitch = 0;
       lift = 0; ground = null; lines = [null, null, null];
       wake();
     },
-    /** s = parsed sensors packet (telemetry.js): five distances, tilt. */
+    /** s = parsed sensors packet (telemetry.js): five raw distances, tilt. */
     sensors(s) {
-      zones = s.zones; zoned = true;
+      const now = performance.now();
+      s.zones.forEach((cm, i) => cloudAdd(cloud, i + (Math.random() - 0.5) * 0.7, ROW_FRONT, cm, now, (Math.random() - 0.5) * 0.01));
       // small leans are just the floor and the sensor's noise
       roll = Math.abs(s.roll) < 4 ? 0 : Math.max(-60, Math.min(60, s.roll));
       pitch = Math.abs(s.pitch) < 4 ? 0 : Math.max(-60, Math.min(60, s.pitch));
@@ -312,6 +358,10 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     /** u = parsed under-the-robot packet (telemetry.js): line sensors, the floor's colour, how far down the floor is. */
     under(u) {
       lines = u.lines; ground = u.floor; lift = liftOf(u.bottom);
+      // the sensor's low and high rows, each one reading for the whole width
+      const now = performance.now();
+      cloudAdd(cloud, 2 + (Math.random() - 0.5) * 1.6, ROW_BOTTOM, u.bottom, now);
+      cloudAdd(cloud, 2 + (Math.random() - 0.5) * 2.4, ROW_TOP, u.top, now, (Math.random() - 0.5) * 0.008);
       wake();
     },
     /** Call the way the robot points right now "away from me". */

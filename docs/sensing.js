@@ -4,6 +4,9 @@
 //   const heat = newHeat();
 //   easeHeat(heat, zones, dt);                  // every frame: zones = five distances in cm, or null
 //   heatAt(heat, u, blocked);                   // -> { cm, alpha, rgb } at one place across the front
+//   const cloud = newCloud();                   // the raw readings, as points that fade
+//   cloudAdd(cloud, u, row, cm, now);           // on each sensors packet
+//   cloudAlpha(point, now);                     // how much of each point shows
 //   liftOf(bottom);                             // 0 on the floor .. 1 picked up high
 //   lineShade(raw);                             // 1 pale floor .. 0 black line
 //   const head = newCompass();                  // the heading, drawn with less lag
@@ -92,6 +95,29 @@ export function heatAt(heat, u, blocked = false) {
   const red = mid * (blocked ? 1 : clamp01((STOP_CM + 2 - cm) / 2));
   const rgb = mix3(mix3(mix3(PALE, YELLOW, yellow), ORANGE, warm), RED, red);
   return { cm, alpha: shown * ends * near * (0.45 + 0.3 * mid), rgb };
+}
+
+// The point cloud: every raw reading from the distance sensor, kept for a moment. It shows what
+// the sensor really sees, floor and blips included; the heat shows only what the bumper acts on.
+export const CLOUD_MS = 1200;                   // how long a point stays
+export const ROW_BOTTOM = -1, ROW_FRONT = 0, ROW_TOP = 1;    // which way the reading looks: down, ahead, up
+/** An empty cloud that keeps the newest `size` points. */
+export function newCloud(size = 96) {
+  return { points: [], size, next: 0 };
+}
+/** Add a reading. u = where across the front it is (0 = left zone .. 4 = right zone), row = which
+ *  way it looks, cm = the reading (nothing, or further than the picture shows, adds no point),
+ *  at = when, in ms. up = metres to draw it above or below its row, so points don't stack. */
+export function cloudAdd(cloud, u, row, cm, at, up = 0) {
+  if (cm === null || cm === undefined || cm > SEE_CM) return;
+  cloud.points[cloud.next] = { u, row, cm, at, up };
+  cloud.next = (cloud.next + 1) % cloud.size;
+}
+/** How much of a point shows now, 0..1: bright when new, gone after CLOUD_MS, and faint when far. */
+export function cloudAlpha(point, now) {
+  const age = (now - point.at) / CLOUD_MS;
+  if (age < 0 || age >= 1) return 0;
+  return (1 - age) * clamp01((SEE_CM - point.cm) / (SEE_CM - SLOW_CM) + 0.15);
 }
 
 // Picked up. The distance sensor's low zone looks down at the floor just ahead of the robot: 7.4 cm
