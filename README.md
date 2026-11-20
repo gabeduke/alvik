@@ -4,11 +4,14 @@ The boys' Arduino Alvik: the stock demo menu plus a **phone remote** mode.
 
 ## Layout
 - `docs/` – the web remote (`index.html`) and the 🔧 flash page (`flash.html`, `flasher.js`)
-- `scripts/build_site.sh` – builds the Pages site into `_site/`; `tests/` – flasher tests
-- `src/` – everything that goes on the robot
-  - `main.py`, `demo.py` – stock menu (demo.py adds a 4th, purple, "phone remote" mode)
+- `scripts/build_site.sh` – builds the Pages site into `_site/`; `tests/` – flasher, build and robot-menu tests
+- `src/` – the robot's own code (the "core")
+  - `main.py`, `demo.py` – the colour menu (stock modes, the purple phone remote, then installed sketches)
+  - `sketchbook.py` – finds the sketches installed on the robot
   - `remote_control.py` – the phone remote (Bluetooth, Bluefruit Connect app)
+  - `dance.py` – the disco dance (remote button 3 and the Disco sketch)
   - `line_follower.py`, `hand_follower.py`, `touch_move.py` – stock Arduino demos
+- `sketches/<name>/` – extra programs for the menu (see [Sketches](#sketches))
 - `stock-backup/` – a copy of whatever was on the robot before we changed it
 
 ## First time
@@ -26,13 +29,17 @@ mpr fs cp src/*.py : + reset                               # deploy src/ and res
 ## Flash from the browser (no terminal)
 **https://gabeduke.github.io/alvik/flash.html** (or the faint 🔧 in the corner of the remote).
 Chrome or Edge on a computer, robot plugged in by USB-C, Arduino Lab for MicroPython closed.
-Connect USB → pick files (all ticked) → ⚡ Flash. Each file is written, checked (sha256 on the robot),
-then the robot restarts into the menu. It flashes the `src/` files from the last push to `main`.
+Connect USB → either **⚡ Flash to robot** on a sketch card, or pick core files (all ticked) → ⚡ Flash.
+Each file is written, checked (sha256 on the robot), then the robot restarts into the menu.
+It flashes the files from the last push to `main`. Flashing a sketch also writes all the core `src/` files,
+so the menu that runs sketches is always up to date.
 It also rescues a stuck robot: Ctrl-C stops whatever is running first. iPad/Android can't do it.
 
 ## Handy commands
 ```sh
 mpr fs cp src/*.py : + reset    # deploy after changes
+mpr fs mkdir :sketches; mpr fs cp -r sketches/disco :sketches/ + reset   # install a sketch by hand
+mpr fs rm -r :sketches/disco    # uninstall a sketch
 mpr repl                        # Python prompt on the robot (Ctrl-] to quit)
 mpr fs ls                       # list files on the robot
 mpr mip install github:arduino/arduino-alvik-mpy   # reinstall the Alvik library if import fails
@@ -52,19 +59,67 @@ Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it 
 Laptop keys: arrows drive, 1-4 for the buttons.
 ```sh
 scripts/build_site.sh && python3 -m http.server -d _site 8000   # then open http://localhost:8000
-node --test tests/*.test.mjs                                     # flasher tests (Node 20+, no installs)
+node --test tests/*.test.mjs                                     # flasher + sketch build tests (Node 20+, no installs)
+python3 tests/test_robot.py                                      # menu + sketches on a pretend Alvik (no installs)
 ```
 `scripts/build_site.sh` builds `_site/` = `docs/` + `robot/*.py` (from `src/`) + `robot/index.json`
-(path, size, sha256 of each), and stamps the build id into `sw.js`. The Pages workflow runs the tests and
-this script, then deploys `_site/`.
+(path, size, sha256 of each) + `sketches/<name>/` (each with its own `index.json`) + `sketches/index.json`
+(every sketch's `sketch.json`, checked by `scripts/sketch_index.py`), and stamps the build id into `sw.js`.
+The Pages workflow runs the tests and this script, then deploys `_site/`.
 
 The flasher (`docs/flasher.js`) is a dependency-free ES module that talks to MicroPython's raw REPL like
 mpremote does, over any `{ write, read }` transport. `tests/fake_repl.mjs` is a pretend board for the tests.
 
 ## Menu colors
-blue = line follower · green = hand follower · red = touch-move · purple = phone remote
+⬆ / ⬇ on the robot pick a program, ✓ runs it, ✗ comes back to the menu.
+Order: red = touch-move · **blue = line follower (start)** · green = hand follower · purple = phone remote ·
+then each installed sketch in its own colour (sorted by folder name): white = 🪩 Disco · yellow = 🐕 Follow me.
+
+More than 6 entries? They come in pages of 6. Page 1 is steady; on page 2 the light blinks off once every
+2 seconds, on page 3 twice, and so on. If a program crashes the lights flash red 3 times and the menu comes back
+(the error is printed over USB: `mpr repl`, or the flash page's Log).
+
+## Sketches
+A sketch is a small program that shows up as an extra colour in the robot's menu. Pick one on the
+[flash page](https://gabeduke.github.io/alvik/flash.html) and press **⚡ Flash to robot**.
+
+| | Sketch | Uses |
+|---|---|---|
+| 🪩 | [`disco`](sketches/disco/) – party lights, wiggle, big spin. ✓ dances again | wheels, lights |
+| 🐕 | [`follow_me`](sketches/follow_me/) – follows your hand like a puppy | distance sensors, wheels, lights |
+
+On the robot, a sketch lives in `/sketches/<name>/` (the same files as in this repo). At boot the menu
+(`src/sketchbook.py`) lists `/sketches/`, reads each `sketch.json`, and adds a menu entry. The first time you
+pick it, it adds `/sketches/<name>` to the end of `sys.path` and imports the entry module. No `__init__.py`,
+no index file on the robot: delete the folder to uninstall.
+
+### How to add a sketch
+1. Make `sketches/<name>/` (`<name>` = lowercase letters, digits, `_`) with:
+   - **`<name>.py`** with a `run(alvik)` function. The menu calls it over and over until ✗ is pressed;
+     return a negative number to go back to the menu straight away (do this if your code waits for ✗ itself).
+     Don't block for long without checking `alvik.get_touch_cancel()`.
+   - **`sketch.json`**:
+     ```json
+     {
+       "title": "Follow me",
+       "emoji": "🐕",
+       "description": "One line for the card on the flash page.",
+       "color": [1, 1, 0],
+       "hardware": ["distance sensors", "wheels", "lights"],
+       "entry": "follow_me"
+     }
+     ```
+     `color` is the menu light, each of red, green, blue 0 or 1 (free ones: cyan `[0,1,1]`; reuse is fine
+     on another page). `entry` is the module to import; its name must not match a file in `src/` or another
+     sketch's entry (the build checks this).
+   - **`README.md`**: what it does, its lights and buttons, which sensors it uses.
+2. More files? Put them in the same folder and `import` them by name (keep the names unique). Shared code can
+   go in `src/` (like `dance.py`); flashing a sketch always flashes `src/` too.
+3. Test: `python3 tests/test_robot.py` and `node --test tests/*.test.mjs`, or copy it onto the robot with
+   mpremote (see Handy commands). Push to `main` and it appears on the flash page about a minute later.
 
 ## Ideas / next
-- Servos (Geekservo 9g 270°) on servo A/B → claw + catapult buttons
+Sketch ideas waiting for hardware (#3): 🦾 claw + catapult (servos), 👀 eyes (OLED).
+- Servos (Geekservo 9g 270°) on servo A/B → claw + catapult buttons (`alvik.set_servo_positions(a, b)`)
 - Xbox Wireless Controller (model 1914) via Bluepad32 (needs Arduino C++, not MicroPython)
 - Eyes on the Qwiic port (uses `alvik.i2c`): Adafruit 1.3" 128x64 OLED STEMMA QT (#938) showing moods — happy driving, scared at the bumper, dizzy after a spin, sleepy when idle, angry when picked up

@@ -3,12 +3,14 @@
 #   docs/*           the web remote, as is
 #   robot/*.py       the robot code from src/, for the 🔧 Flash page
 #   robot/index.json [{path, size, sha256}] for each file (see index_dir below)
+#   sketches/<name>/*            each folder from sketches/ (one per sketch), with its own index.json
+#   sketches/index.json          every sketch's sketch.json, checked by scripts/sketch_index.py
 # and stamps the build id (default: short commit SHA) into sw.js so installed copies update.
 #   scripts/build_site.sh && python3 -m http.server -d _site
-# To ship another folder of files (e.g. sketches/ for #3): copy it in and call index_dir on it.
+# OUT=/some/dir builds somewhere else (the tests do).
 set -eu
 cd "$(dirname "$0")/.."
-OUT=_site
+OUT=${OUT:-_site}
 BUILD=${BUILD:-$(git rev-parse --short=7 HEAD 2>/dev/null || echo dev)}
 
 # index_dir DIR: writes DIR/index.json listing every file under DIR (relative paths, sorted).
@@ -38,6 +40,17 @@ cp -R docs "$OUT"
 mkdir -p "$OUT/robot"
 cp src/*.py "$OUT/robot/"
 index_dir "$OUT/robot"
+
+# Sketches go to /sketches/<name>/ on the robot, where the menu finds them (src/sketchbook.py).
+mkdir -p "$OUT/sketches"
+for d in sketches/*/; do
+  [ -d "$d" ] || continue
+  name=$(basename "$d")
+  mkdir -p "$OUT/sketches/$name"
+  cp -R "$d". "$OUT/sketches/$name/"
+  index_dir "$OUT/sketches/$name"
+done
+python3 scripts/sketch_index.py "$OUT/sketches" src
 
 python3 - "$OUT/sw.js" "$BUILD" <<'PY'
 import sys

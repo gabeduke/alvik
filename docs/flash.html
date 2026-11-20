@@ -63,6 +63,20 @@
   #unsupported { background: #4a2030; color: var(--text); font-size: 18px; }
   details { color: var(--muted); font-size: 14px; }
   summary { cursor: pointer; }
+  #sketches { display: grid; gap: 12px; }
+  .card { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; background: rgba(255,255,255,.06); border-radius: 16px; padding: 14px; }
+  .card .emoji { font-size: 44px; line-height: 1; grid-row: span 2; }
+  .card h3 { margin: 0; font-size: 21px; }
+  .card p { margin: 2px 0 6px; color: var(--muted); font-size: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; padding: 2px 9px; border-radius: 999px; background: rgba(255,255,255,.1); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); }
+  .card .go { grid-column: 2; justify-self: start; margin-top: 8px; background: var(--disco); }
+  .card .cstate { grid-column: 1 / -1; font-size: 15px; color: var(--muted); }
+  .card .cstate:empty { display: none; }
+  .card .cstate.ok { color: var(--bumper); }
+  .card .cstate.bad { color: var(--bad); }
+  @media (max-width: 420px) { .card { grid-template-columns: 1fr; } .card .emoji { grid-row: auto; } .card .go { grid-column: 1; } }
   #log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; background: #120e22; border-radius: 12px; padding: 10px; margin-top: 8px; font-size: 12px; }
 </style>
 </head>
@@ -85,6 +99,7 @@
     <li>Close <b>Arduino Lab for MicroPython</b> (and Thonny, mpremote or any serial monitor) first: only one program can use the USB port.</li>
     <li><b>“Port busy” or “couldn't open”?</b> Close the other program, unplug the cable, plug it back in and press Connect again.</li>
     <li>It works even if the robot is stuck: it stops whatever is running first.</li>
+    <li>A <b>sketch</b> is an extra program for the menu. Flashing one also updates the menu itself. After the restart, press ⬆ until you see the sketch's colour, then ✓.</li>
   </ul>
 </section>
 
@@ -98,7 +113,12 @@
 </section>
 
 <section>
-  <h2>2. Pick the files</h2>
+  <h2>2. Add a sketch</h2>
+  <div id="sketches"><p class="notes">Loading the sketches…</p></div>
+</section>
+
+<section>
+  <h2>3. Or flash just the robot's own code</h2>
   <ul id="files"><li><span></span><span class="size">Loading the file list…</span></li></ul>
   <div class="row">
     <button id="flash" disabled>⚡ Flash</button>
@@ -116,13 +136,16 @@
 
 <script type="module">
 import { initPwa } from "./pwa.js";
-import { loadIndex, loadFile, openSerial, flashFiles, FlashError, USB_FILTERS } from "./flasher.js";
+import { loadIndex, loadFile, loadSketchList, loadSketchFiles, openSerial, flashFiles, FlashError, USB_FILTERS } from "./flasher.js";
 
 const $ = (id) => document.getElementById(id);
-const base = new URL("robot/", location.href);
+const site = new URL("./", location.href);
+const base = new URL("robot/", site);
 let entries = [];          // from robot/index.json
 let port = null, transport = null, flashing = false;
 const rows = new Map();    // path -> { li, box, state }
+const cards = [];          // { sketch, go, state }
+const COLOR_NAMES = { "1,0,0": "red", "0,1,0": "green", "0,0,1": "blue", "1,1,0": "yellow", "0,1,1": "cyan", "1,0,1": "purple", "1,1,1": "white" };
 
 const pwa = initPwa({ isBusy: () => flashing, name: "This page", whenBusy: "It will reload when flashing is done." });
 
@@ -151,6 +174,10 @@ function update() {
   $("flash").textContent = picked && picked < rows.size ? `⚡ Flash ${picked} file${picked > 1 ? "s" : ""}` : "⚡ Flash";
   for (const r of rows.values()) r.box.disabled = flashing;
   $("all").disabled = $("none").disabled = flashing;
+  for (const c of cards) {
+    c.go.disabled = flashing || !on;
+    c.go.title = on ? "" : "Connect USB first";
+  }
 }
 
 async function disconnect() {
@@ -208,38 +235,121 @@ function onEvent(e) {
   }
 }
 
-async function flash() {
-  const picked = entries.filter((e) => rows.get(e.path).box.checked);
-  if (!picked.length || !transport) return;
+// Flashes files (from load()) and reports in #result. onEvent also gets every progress event.
+// Returns true if every file was written and checked.
+async function flashJob(load, { onEvent: extra = () => {}, done = "✅ Done, the robot is restarting into the menu." } = {}) {
   flashing = true;
   update();
   result("");
-  for (const e of picked) setRow(e.path, "", "waiting…");
-  let gone = false;
+  let gone = false, ok = false;
   try {
     log("downloading files…");
-    const files = await Promise.all(picked.map((e) => loadFile(base, e)));
-    const results = await flashFiles(transport, files, { onEvent, log });
+    const files = await load();
+    const results = await flashFiles(transport, files, { onEvent: (e) => { onEvent(e); extra(e); }, log });
     gone = true;   // machine.reset() drops the USB port; it comes back in a few seconds
     const bad = results.filter((r) => !r.ok);
-    if (!bad.length) {
-      result("✅ Done, the robot is restarting into the menu.",
-        "Give it a few seconds. To flash again, press Connect again.");
+    ok = !bad.length;
+    if (ok) {
+      result(done, "Give it a few seconds. To flash again, press Connect again.");
     } else {
       result(`⚠️ ${bad.length} of ${results.length} file${results.length > 1 ? "s" : ""} didn't flash. The robot is restarting anyway.`,
-        "See the ✗ above. Fix it, then connect again and flash.");
+        "See the ✗ in the list. Fix it, then connect again and flash.");
+      for (const r of bad) log(`✗ ${r.path}: ${r.error}`);
     }
   } catch (e) {
     gone = true;
     result("❌ " + errorText(e), e.hint || "");
     if (e.detail) log(String(e.detail));
-    for (const p of picked) if (!rows.get(p.path).state.className.match(/ok|bad/)) setRow(p.path, "", "");
   } finally {
     flashing = false;
     if (gone) await disconnect();
+    for (const r of rows.values()) if (!/ok|bad/.test(r.state.className)) { r.state.className = "state"; r.state.innerHTML = ""; }
     update();
     pwa.idle();
   }
+  return ok;
+}
+
+async function flash() {
+  const picked = entries.filter((e) => rows.get(e.path).box.checked);
+  if (!picked.length || !transport) return;
+  for (const e of picked) setRow(e.path, "", "waiting…");
+  await flashJob(() => Promise.all(picked.map((e) => loadFile(base, e))));
+}
+
+async function flashSketch(card) {
+  const { sketch, state } = card;
+  if (!transport) return;
+  for (const c of cards) { c.state.textContent = ""; c.state.className = "cstate"; }
+  state.className = "cstate";
+  state.textContent = "Downloading…";
+  let total = 0, count = 0;
+  const ok = await flashJob(async () => {
+    const files = await loadSketchFiles(site, sketch.name);
+    total = files.length;
+    return files;
+  }, {
+    done: `✅ ${sketch.emoji} ${sketch.title} is on the robot. It's restarting into the menu.`,
+    onEvent: (e) => {
+      if (e.type === "stage") {
+        if (e.stage === "connect") state.textContent = "Stopping the robot's program…";
+        if (e.stage === "reset") state.textContent = "Restarting the robot…";
+      } else if (e.state === "writing" && e.written === 0) {
+        state.textContent = `Copying ${++count} of ${total}: ${e.path}`;
+      }
+    },
+  });
+  const light = colorName(sketch.color);
+  state.className = "cstate " + (ok ? "ok" : "bad");
+  state.textContent = ok
+    ? `✓ Installed. On the robot: press ⬆ until the lights are ${light}, then ✓.`
+    : "✗ Didn't finish. See the message below, then connect and try again.";
+}
+
+function colorName(rgb) {
+  return COLOR_NAMES[rgb.map((c) => (c ? 1 : 0)).join(",")] || "lit";
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+async function loadSketches() {
+  const box = $("sketches");
+  let list;
+  try {
+    list = await loadSketchList(site);
+  } catch (e) {
+    box.innerHTML = "";
+    box.append(el("p", "bad", `Couldn't load the sketches: ${e.message}`));
+    return;
+  }
+  box.innerHTML = "";
+  if (!list.length) box.append(el("p", "notes", "No sketches yet."));
+  for (const sketch of list) {
+    const card = el("div", "card");
+    card.dataset.sketch = sketch.name;
+    const body = el("div");
+    const chips = el("div", "chips");
+    const light = el("span", "chip");
+    const dot = el("span", "swatch");
+    dot.style.background = `rgb(${sketch.color.map((c) => (c ? 255 : 0)).join(",")})`;
+    light.append(dot, `menu light: ${colorName(sketch.color)}`);
+    chips.append(light, ...(sketch.hardware || []).map((h) => el("span", "chip", h)));
+    body.append(el("h3", "", sketch.title), el("p", "", sketch.description), chips);
+    const go = el("button", "go", "⚡ Flash to robot");
+    const state = el("div", "cstate");
+    state.setAttribute("aria-live", "polite");
+    card.append(el("div", "emoji", sketch.emoji), body, go, state);
+    box.append(card);
+    const c = { sketch, go, state };
+    go.addEventListener("click", () => flashSketch(c));
+    cards.push(c);
+  }
+  update();
 }
 
 async function loadList() {
@@ -282,6 +392,7 @@ if (!navigator.serial) {
   });
 }
 update();
+loadSketches();
 loadList();
 </script>
 </body>

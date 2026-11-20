@@ -416,6 +416,29 @@ export async function loadBundle(base, fetchFn = fetch) {
   return Promise.all(entries.map((e) => loadFile(base, e, fetchFn)));
 }
 
+// ---------- sketches ----------
+// The site has sketches/index.json ({ sketches: [{ name, title, emoji, description, color, hardware,
+// entry }] }) and one folder per sketch with its own index.json. On the robot a sketch lives in
+// /sketches/<name>/, where the menu (src/sketchbook.py) finds it at boot.
+
+export async function loadSketchList(site, fetchFn = fetch) {
+  const res = await fetchFn(new URL("sketches/index.json", site), { cache: "no-cache" });
+  if (!res.ok) throw new FlashError(`Couldn't load the sketch list (${res.status}).`);
+  return (await res.json()).sketches;
+}
+
+// Everything a sketch needs on the robot: the sketch folder, plus all the core robot files (the
+// menu that runs sketches), so a robot with old code still gets a menu that can find it.
+// Returns [{ path, size, sha256, data }] with robot paths: "demo.py", "sketches/<name>/<file>".
+export async function loadSketchFiles(site, name, fetchFn = fetch) {
+  if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new FlashError(`Bad sketch name ${JSON.stringify(name)}.`);
+  const [core, own] = await Promise.all([
+    loadBundle(new URL("robot/", site), fetchFn),
+    loadBundle(new URL(`sketches/${name}/`, site), fetchFn),
+  ]);
+  return [...core, ...own.map((f) => ({ ...f, path: `sketches/${name}/${f.path}` }))];
+}
+
 // ---------- Web Serial ----------
 
 // USB vendor ids for the port picker: Arduino (the Alvik's Nano ESP32) and Espressif.

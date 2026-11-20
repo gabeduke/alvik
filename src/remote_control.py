@@ -12,8 +12,10 @@
 # Press the robot's X (cancel) touch button to go back to the menu.
 
 import bluetooth
-from time import sleep_ms, ticks_ms, ticks_add, ticks_diff
+from time import sleep_ms
 from micropython import const
+
+from dance import Dance
 
 # ---------- tweakables ----------
 ROBOT_NAME = "Alvik"
@@ -22,10 +24,7 @@ TURBO_SPEED = 13     # cm/s (about Alvik's top speed)
 TURN = 90            # deg/s
 BUMPER_CM = 12       # stop when something is closer than this in front
 COLORS = [(1, 1, 1), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 0), (0, 0, 0)]
-DISCO = COLORS[1:7]  # bright colours only
-DANCE_MS = 4000      # whole dance
-BEAT_MS = 250        # lights change every beat; direction flips every 2 beats
-WIGGLE = 120         # deg/s while wiggling back and forth
+# the dance itself (lights, wiggle, spin) is in dance.py
 
 # ---------- Bluetooth: Nordic UART Service (what Bluefruit Connect talks to) ----------
 _IRQ_CONNECT = const(1)
@@ -120,9 +119,8 @@ def run_remote(alvik):
     turbo = False
     bumper = True
     color_i = 0
-    dance_until = 0
-    dance_start = 0
-    last_beat = -1
+    dance = Dance(alvik)
+    dancing = False
     was_connected = False
     blocked = False
 
@@ -137,7 +135,8 @@ def run_remote(alvik):
         if _link.lost:              # phone went away -> stop right away
             _link.lost = False
             held.clear()
-            dance_until = 0
+            dance.stop()
+            dancing = False
             alvik.brake()
             _lights(alvik, (1, 1, 0))
 
@@ -148,17 +147,15 @@ def run_remote(alvik):
                     held.add(button)
                 else:
                     held.discard(button)
-                if dance_until:
-                    dance_until = ticks_ms()   # arrows stop the dance (ends next tick)
+                dance.stop()               # arrows stop the dance (lights come back next tick)
             elif pressed and button == 1:
                 color_i = (color_i + 1) % len(COLORS)
                 _lights(alvik, COLORS[color_i])
             elif pressed and button == 2:
                 turbo = not turbo
             elif pressed and button == 3:
-                dance_start = ticks_ms()
-                dance_until = ticks_add(dance_start, DANCE_MS)
-                last_beat = -1
+                dance.begin()
+                dancing = True
             elif pressed and button == 4:
                 bumper = not bumper
                 _lights(alvik, (0, 1, 0) if bumper else (1, 0, 0))   # quick green/red flash
@@ -166,21 +163,12 @@ def run_remote(alvik):
                 _lights(alvik, COLORS[color_i])
 
         # work out how to move this tick
-        now = ticks_ms()
-        if dance_until and ticks_diff(dance_until, now) > 0:
-            beat = ticks_diff(now, dance_start) // BEAT_MS
-            if beat != last_beat:          # disco lights: left and right different colours
-                last_beat = beat
-                alvik.left_led.set_color(*DISCO[beat % len(DISCO)])
-                alvik.right_led.set_color(*DISCO[(beat + 3) % len(DISCO)])
-            linear = 0
-            if ticks_diff(dance_until, now) < 1000:
-                angular = 360              # big finish: one full spin
-            else:
-                angular = WIGGLE if (beat // 2) % 2 == 0 else -WIGGLE
+        move = dance.step() if dancing else None
+        if move:
+            linear, angular = move
         else:
-            if dance_until:                # dance just ended -> back to normal lights
-                dance_until = 0
+            if dancing:                    # dance just ended -> back to normal lights
+                dancing = False
                 _lights(alvik, COLORS[color_i])
             speed = TURBO_SPEED if turbo else SPEED
             linear = (speed if 5 in held else 0) - (speed if 6 in held else 0)

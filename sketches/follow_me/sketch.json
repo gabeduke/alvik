@@ -1,0 +1,8 @@
+{
+  "title": "Follow me",
+  "emoji": "🐕",
+  "description": "Walks after your hand like a puppy, turning to keep you in front of it.",
+  "color": [1, 1, 0],
+  "hardware": ["distance sensors", "wheels", "lights"],
+  "entry": "follow_me"
+}

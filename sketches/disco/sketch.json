@@ -1,0 +1,8 @@
+{
+  "title": "Disco",
+  "emoji": "🪩",
+  "description": "Flashing party lights, a wiggle and a big spin. Press ✓ to dance again.",
+  "color": [1, 1, 1],
+  "hardware": ["wheels", "lights"],
+  "entry": "disco"
+}
