@@ -218,5 +218,61 @@
    "blocked": false,
    "dancing": false
   }
+ },
+ {
+  "note": "sensors: flat on the floor, wall ahead on the right, battery 82%",
+  "sensors": {
+   "distances": [
+    null,
+    60,
+    25.4,
+    11,
+    9
+   ],
+   "roll": 0.4,
+   "pitch": -0.6,
+   "battery": 82
+  },
+  "hex": "2153ff3c190b0900ff52d2",
+  "page": {
+   "zones": [
+    null,
+    60,
+    25,
+    11,
+    9
+   ],
+   "roll": 0,
+   "pitch": -1,
+   "battery": 82
+  }
+ },
+ {
+  "note": "sensors: picked up and tipped, nothing in sight, battery not known yet",
+  "sensors": {
+   "distances": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "roll": -35.2,
+   "pitch": 170,
+   "battery": null
+  },
+  "hex": "2153ffffffffffdd7fff35",
+  "page": {
+   "zones": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "roll": -35,
+   "pitch": 127,
+   "battery": null
+  }
  }
 ]

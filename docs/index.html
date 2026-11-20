@@ -28,7 +28,7 @@
     overflow: hidden;
   }
   header { width: 100%; max-width: 1000px; display: flex; align-items: center; gap: 12px; }
-  h1 { margin: 0; font-size: 28px; flex: 1; }
+  h1 { margin: 0; font-size: 28px; flex: 1; white-space: nowrap; }
   #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
   @media (max-width: 560px) { #statusText, #toolsText, #layout span, #title { display: none; } #layout button { font-size: 18px; padding: 5px 8px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
   #dot { width: 14px; height: 14px; border-radius: 50%; background: #777; }
@@ -42,10 +42,9 @@
   #msg:empty { display: none; }
   main {
     flex: 1; width: 100%; max-width: 1000px;
-    display: flex; align-items: center; justify-content: space-around; gap: 24px; flex-wrap: wrap;
   }
   .stick {
-    --size: min(80vw, 56vh, 340px);
+    --size: min(80vw, 42vh, 340px);
     width: var(--size); height: var(--size); border-radius: 50%; position: relative;
     background: radial-gradient(circle, #3a3163 0%, var(--panel) 70%);
     box-shadow: inset 0 0 0 6px rgba(255,255,255,.08), 0 6px 0 rgba(0,0,0,.35);
@@ -65,7 +64,7 @@
     transition: transform .12s ease-out;
   }
   .stick.active #knob { transition: none; filter: brightness(1.15); }
-  .actions { display: grid; grid-template-columns: repeat(2, min(40vw, 170px)); gap: 14px; }
+  .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 520px; }
   button.big {
     font: inherit; color: #1b1630; border: 0; border-radius: 22px; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -73,9 +72,10 @@
   }
   button.big:disabled { opacity: .35; }
   button.big.down { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.15); }
-  button.big.action { height: min(40vw, 32vh, 150px); font-size: 22px; font-weight: 800; gap: 4px; }
-  .action .emoji { font-size: min(13vw, 56px); line-height: 1; }
-  .action .state { font-size: 15px; font-weight: 700; opacity: .75; min-height: 1em; }
+  button.big.action { height: clamp(58px, 11vh, 86px); font-size: 14px; font-weight: 800; gap: 1px; border-radius: 18px; padding: 0; }
+  .action .emoji { font-size: clamp(24px, 4.4vh, 32px); line-height: 1.1; }
+  .action .state { font-size: 11px; font-weight: 700; opacity: .75; line-height: 1; }
+  .action .state:empty { display: none; }
   .action[data-b="1"] { background: var(--lights); }
   .action[data-b="2"] { background: var(--turbo); }
   .action[data-b="3"] { background: var(--disco); }
@@ -107,33 +107,30 @@
   #steer .mark.w { left: 12px; } #steer .mark.e { right: 12px; }
   body[data-layout="two"] #stick { display: none; }
   body[data-layout="two"] .slider { display: flex; }
-  body[data-layout="two"] main {
-    display: grid; grid-template-areas: "a a" "t s"; justify-items: center; align-items: center;
-    justify-content: space-between; align-content: space-around;
+  /* Where things go. The 3D robot gets whatever room is left; the four buttons are a slim dock.
+       one hand, tall:  robot / joystick / dock          one hand, wide:  joystick | robot over dock
+       two hands, tall: dock / speed | robot over steer  two hands, wide: speed | robot over dock | steer */
+  main {
+    display: grid; gap: 14px; min-height: 0; justify-items: center; align-items: center;
+    grid-template-areas: "w" "k" "a"; grid-template-rows: minmax(0, 1fr) auto auto; grid-template-columns: minmax(0, 1fr);
   }
-  body[data-layout="two"] #throttle { grid-area: t; }
-  body[data-layout="two"] #steer { grid-area: s; }
-  body[data-layout="two"] .actions { grid-area: a; grid-template-columns: repeat(4, min(21vw, 150px)); gap: 10px; }
-  body[data-layout="two"] button.big.action { height: min(21vw, 22vh, 130px); font-size: min(3.6vw, 18px); }
-  body[data-layout="two"] .action .emoji { font-size: min(8vw, 44px); }
-  body[data-layout="two"] .action .state { font-size: 12px; }
+  #stick { grid-area: k; } .actions { grid-area: a; } #throttle { grid-area: t; } #steer { grid-area: s; }
+  body[data-layout="two"] main {
+    grid-template-areas: "a a" "t w" "t s"; grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
   @media (min-aspect-ratio: 1/1) {
-    body[data-layout="two"] main { grid-template-areas: "t a s"; grid-template-columns: auto 1fr auto; }
+    .stick { --size: min(40vw, 62vh, 340px); }
+    main { grid-template-areas: "k w" "k a"; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: auto minmax(0, 1fr); column-gap: 24px; }
+    body[data-layout="two"] main { grid-template-areas: "t w s" "t a s"; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: auto minmax(0, 1fr) auto; }
     #throttle { --w: min(16vw, 130px); height: min(62vh, 340px); }
     #steer { --w: min(16vw, 130px); width: min(30vw, 340px); }
-    body[data-layout="two"] .actions { grid-template-columns: repeat(2, min(15vw, 150px)); gap: 14px; }
-    body[data-layout="two"] button.big.action { height: min(15vw, 28vh, 150px); font-size: min(2.2vw, 20px); }
-    body[data-layout="two"] .action .emoji { font-size: min(6vw, 12vh, 52px); }
   }
-  /* The 3D robot. It must never crowd the controls, so where it goes depends on the room there is:
-     one hand, tall screen: a small picture in the corner above the joystick (tap = big, tap = small)
-     one hand, wide screen: a panel between the joystick and the buttons
-     two hands: in the gap above the steering slider (tall) or above the buttons (wide, if tall enough) */
-  main { position: relative; }
+  /* The 3D robot: a live copy of the real one (twin.js), with a few numbers over it. */
   #twin {
-    position: absolute; top: -10px; right: -6px; width: clamp(72px, 21vw, 92px); height: clamp(72px, 21vw, 92px); z-index: 2;
-    border-radius: 18px; overflow: hidden; background: var(--bg); cursor: pointer;
-    box-shadow: inset 0 0 0 3px rgba(255,255,255,.08), 0 4px 0 rgba(0,0,0,.35);
+    grid-area: w; position: relative; width: 100%; align-self: stretch; min-height: 0;
+    border-radius: 18px; overflow: hidden; background: var(--bg);
+    box-shadow: 0 4px 0 rgba(0,0,0,.35);
   }
   #twin[hidden] { display: none; }
   #twin canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }   /* never sets the card's size */
@@ -141,47 +138,22 @@
     content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     box-shadow: inset 0 0 0 3px rgba(255,255,255,.1);
   }
-  #twin.big { left: -6px; width: auto; height: min(44vh, 100vw); }
   #twinCredit {             /* who made the model: the licence asks for it */
-    position: absolute; left: 8px; top: 7px; font-size: 10px; color: var(--muted); opacity: .75; white-space: nowrap;
-    max-width: calc(100% - 52px); overflow: hidden; text-overflow: ellipsis;
+    position: absolute; left: 10px; top: 7px; font-size: 10px; color: var(--muted); opacity: .75; white-space: nowrap;
+    max-width: calc(100% - 56px); overflow: hidden; text-overflow: ellipsis;
   }
   #twinCredit a { color: inherit; }
-  #twinInfo {
-    position: absolute; left: 8px; bottom: 6px; font-size: 13px; font-weight: 700; color: var(--muted);
-    pointer-events: none; text-shadow: 0 1px 2px #000; white-space: nowrap;
+  #twinStats {
+    position: absolute; left: 10px; right: 10px; bottom: 7px; display: flex; gap: 12px; pointer-events: none;
+    font-size: 14px; font-weight: 700; color: var(--muted); text-shadow: 0 1px 2px #000; white-space: nowrap;
   }
   #twinInfo.slow { color: var(--lights); } #twinInfo.stop { color: #ff6b6b; }
+  #twinBattery { margin-left: auto; } #twinBattery.low { color: #ff6b6b; }
   #twinNorth {
     position: absolute; right: 6px; top: 6px; font: inherit; font-size: 18px; line-height: 1; padding: 6px;
     border: 0; border-radius: 10px; background: rgba(42,35,71,.8); cursor: pointer;
   }
-  #twin:not(.big) #twinNorth, #twin:not(.big) #twinInfo, #twin:not(.big) #twinCredit { display: none; }
-  @media (min-aspect-ratio: 1/1) {
-    body[data-layout="stick"] #twin {
-      position: relative; flex: 1 1 0; min-width: 130px; max-width: 340px; width: auto;
-      height: min(56vh, 340px); cursor: default;
-    }
-    body[data-layout="stick"] #twin #twinNorth, body[data-layout="stick"] #twin #twinInfo,
-    body[data-layout="stick"] #twin #twinCredit { display: block; }
-  }
-  body[data-layout="two"] #twin {
-    position: relative; grid-area: w; width: 100%; height: auto; align-self: stretch; min-height: 0;
-    max-width: 340px; cursor: default;
-  }
-  body[data-layout="two"] #twin #twinNorth, body[data-layout="two"] #twin #twinInfo,
-  body[data-layout="two"] #twin #twinCredit { display: block; }
-  body[data-layout="two"] main {
-    grid-template-areas: "a a" "t w" "t s"; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 12px; min-height: 0;
-  }
-  @media (min-aspect-ratio: 1/1) {
-    body[data-layout="two"] main { grid-template-areas: "t w s" "t a s"; grid-template-rows: minmax(0, 1fr) auto; }
-    body[data-layout="two"] #twin { max-width: none; }
-  }
-  @media (min-aspect-ratio: 1/1) and (max-height: 620px) {
-    body[data-layout="two"] main { grid-template-areas: "t a s"; grid-template-rows: auto; }
-    body[data-layout="two"] #twin { display: none; }
-  }
+  @media (max-height: 480px) { .action .state { display: none; } #twinCredit { display: none; } }
   /* one hand / two hands switch: both shown, the one in use is lit */
   #layout { display: flex; background: var(--panel); border-radius: 12px; padding: 3px; gap: 2px; }
   #layout button {
@@ -224,7 +196,7 @@
 
   <div id="twin" hidden title="This is your robot, live">
     <canvas aria-label="A 3D picture of the robot. It turns, drives and lights up like the real one."></canvas>
-    <span id="twinInfo"></span>
+    <div id="twinStats"><span id="twinInfo"></span><span id="twinSpeed"></span><span id="twinBattery"></span></div>
     <span id="twinCredit">3D: <a href="https://docs.arduino.cc/hardware/alvik/" target="_blank" rel="noopener">Arduino</a> +
       <a href="https://makerworld.com/en/models/1298936" target="_blank" rel="noopener">GiulioT</a> · CC BY-NC-SA</span>
     <button id="twinNorth" title="Tap when the robot is pointing away from you">🧭</button>
@@ -242,7 +214,7 @@
 
 <script type="module">
 import { initPwa } from "./pwa.js";
-import { NUS_TX, telemetryRequest, telemetryReader } from "./telemetry.js";
+import { NUS_TX, telemetryRequest, telemetryReader } from "./telemetry.js";   // packets: see there
 
 // Talks to remote_control.py on the robot over the Nordic UART service.
 // Buttons are the "Control Pad" packets the Bluefruit Connect app sends:
@@ -405,6 +377,7 @@ function setConnected(on) {
   heard = false;
   twin?.reset();
   showDistance(null);
+  showBattery(null);
   if (on) {
     turbo = false; bumper = true; showToggles();
   } else {
@@ -426,6 +399,19 @@ function showDistance(t) {
   const info = $("twinInfo"), cm = t?.distance ?? null;
   info.textContent = cm === null || cm > 99 ? "" : `🧱 ${cm} cm`;
   info.className = t?.blocked || (cm !== null && cm < 12) ? "stop" : cm !== null && cm < 30 ? "slow" : "";
+  const speed = Math.round(Math.abs(t?.speed ?? 0));
+  $("twinSpeed").textContent = speed ? `💨 ${speed} cm/s` : "";
+}
+
+// The second packet: all five distance zones, how the robot is tilted, and the battery.
+function onSensors(s) {
+  twin?.sensors(s);
+  showBattery(s.battery);
+}
+function showBattery(pct) {
+  const el = $("twinBattery");
+  el.textContent = pct === null || pct === undefined ? "" : `${pct < 20 ? "🪫" : "🔋"} ${pct}%`;
+  el.classList.toggle("low", pct !== null && pct < 20);
 }
 
 function onTelemetry(t) {
@@ -444,7 +430,7 @@ function onTelemetry(t) {
 async function listen(service) {
   try {
     const tx = await service.getCharacteristic(NUS_TX);
-    const feed = telemetryReader(onTelemetry);
+    const feed = telemetryReader(onTelemetry, onSensors);
     tx.addEventListener("characteristicvaluechanged", (e) => {
       const v = e.target.value;
       feed(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
@@ -564,10 +550,7 @@ import("./twin.js")
   .then((t) => { twin = t; })
   .catch((e) => { twinEl.hidden = true; console.warn("no 3D robot", e); });
 twinEl.addEventListener("click", (e) => {
-  if (e.target.id === "twinNorth") { twin?.recentre(); return; }
-  if (e.target.closest("a")) return;
-  // small picture in the corner (one hand, tall screen): tap to make it big, tap again to shrink
-  if (getComputedStyle(twinEl).position === "absolute") twinEl.classList.toggle("big");
+  if (e.target.id === "twinNorth") twin?.recentre();
 });
 
 // Installable app + self-updating (pwa.js). Never reload while connected: that drops Bluetooth

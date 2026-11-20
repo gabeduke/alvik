@@ -11,11 +11,20 @@
 //     flags     bit 0 turbo, 1 bumper, 2 blocked by the bumper, 3 dancing
 //   checksum = ~(sum of the bytes before it) & 0xff
 //
+// Right after it comes a second packet with the other sensors (robot code from before it existed
+// just doesn't send it):
+//
+//   '!' 'S' <left> <half left> <middle> <half right> <right> <roll> <pitch> <battery> <checksum>
+//     five distances in cm, as the sensor sees them from left to right; 255 = nothing seen
+//     roll, pitch   int8, whole degrees, as the robot's IMU reports them
+//     battery       0..100 percent; 255 = not known
+//
 // tests/telemetry_vectors.json holds example packets that both this file and the robot code are
 // tested against.
 
 export const NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // robot talks here
 export const TELEMETRY_LEN = 10;
+export const SENSORS_LEN = 11;
 
 const checksum = (bytes, n) => {
   let sum = 0;
@@ -47,9 +56,20 @@ export function parseTelemetry(bytes) {
   };
 }
 
+/** One whole sensors packet (11 bytes) -> the readings, or null if it is not a good packet. */
+export function parseSensors(bytes) {
+  if (bytes.length !== SENSORS_LEN || bytes[0] !== 0x21 || bytes[1] !== 0x53) return null;
+  if (checksum(bytes, SENSORS_LEN - 1) !== bytes[SENSORS_LEN - 1]) return null;
+  return {
+    zones: [...bytes.slice(2, 7)].map((d) => (d === 255 ? null : d)),   // cm, left to right
+    roll: int8(bytes[7]), pitch: int8(bytes[8]),                        // degrees
+    battery: bytes[9] === 255 ? null : bytes[9],                        // percent
+  };
+}
+
 /** Feed it whatever arrives (packets can come in pieces, or with junk between): calls onPacket for
- *  each good one. Returns the function to feed. */
-export function telemetryReader(onPacket) {
+ *  each good telemetry packet and onSensors for each good sensors packet. Returns the function to feed. */
+export function telemetryReader(onPacket, onSensors = () => {}) {
   let buf = [];
   return (chunk) => {
     buf.push(...chunk);
@@ -58,10 +78,13 @@ export function telemetryReader(onPacket) {
       if (i < 0) { buf = []; return; }
       if (i) buf = buf.slice(i);
       if (buf.length < 2) return;
-      if (buf[1] !== 0x54) { buf.shift(); continue; }
-      if (buf.length < TELEMETRY_LEN) return;
-      const t = parseTelemetry(buf.slice(0, TELEMETRY_LEN));
-      if (t) { buf = buf.slice(TELEMETRY_LEN); onPacket(t); } else buf.shift();   // damaged: find the next '!'
+      if (buf[1] !== 0x54 && buf[1] !== 0x53) { buf.shift(); continue; }
+      const sensors = buf[1] === 0x53, len = sensors ? SENSORS_LEN : TELEMETRY_LEN;
+      if (buf.length < len) return;
+      const t = (sensors ? parseSensors : parseTelemetry)(buf.slice(0, len));
+      if (!t) { buf.shift(); continue; }                                 // damaged: find the next '!'
+      buf = buf.slice(len);
+      (sensors ? onSensors : onPacket)(t);
     }
   };
 }

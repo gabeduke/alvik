@@ -4,6 +4,7 @@
 //
 //   const twin = await createTwin(canvas);      // loads three.js and models/alvik.glb
 //   twin.update(t);                             // t = a parsed telemetry packet
+//   twin.sensors(s);                            // s = a parsed sensors packet (five distances, tilt)
 //   twin.reset();                               // robot went away: stand still, lights off
 //   twin.recentre();                            // "the robot is pointing away from me right now"
 //
@@ -18,6 +19,9 @@ const WHEEL_R = 0.017, TRACK = 0.0895;          // metres: wheel radius, distanc
 const NOSE = 0.048;                             // front face, from the middle
 const SLOW_CM = 30, STOP_CM = 12;               // as on the robot: bumper slows from 30 cm, stops at 12
 const SEE_CM = 40;                              // the wall fades in from here
+const ZONE_DEG = 18;                            // the five distance zones are drawn this far apart
+const ROLL_SIGN = 1, PITCH_SIGN = 1;            // flip if the 3D robot tips the wrong way
+const FLASH_MS = 120;                           // blink of the strips while the bumper holds the robot
 const STALE_MS = 1000;                          // no news for this long: stop the wheels
 const BG = 0x1b1630, FLOOR = 0x2a2347, GRID = 0x4a3f7c, CELL = 0.05;
 const AZIMUTH = 0.42, ELEVATION = 0.6;          // camera: radians round to the robot's right, and up
@@ -76,16 +80,23 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     lamp.intensity = on ? 0.06 : 0;
   }
 
-  // the thing in front: a see-through wall that comes closer, yellow when the robot slows, red when it stops
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0, roughness: 0.6, depthWrite: false });
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.06, 0.008), wallMat);
-  wall.visible = false;
-  robot.add(wall);
+  // what the distance sensor sees: five see-through wall pieces, one for each zone from left to
+  // right. Each comes closer on its own; yellow where the robot slows, red where it stops.
+  const walls = [0, 1, 2, 3, 4].map((i) => {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0, roughness: 0.6, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.055, 0.006), mat);
+    mesh.visible = false;
+    mesh.rotation.y = THREE.MathUtils.degToRad((2 - i) * ZONE_DEG);     // the robot's left is +X
+    robot.add(mesh);
+    return mesh;
+  });
 
   // ---------- state ----------
   let target = 0, shown = 0, zero = null;       // heading in degrees: latest from the robot, drawn, and what counts as 0
   let speed = 0, turn = 0;                      // cm/s, deg/s
-  let distance = null, blocked = false;
+  let zones = [null, null, null, null, null], zoned = false, blocked = false;   // cm, left to right
+  let lights = [[0, 0, 0], [0, 0, 0]];
+  let roll = 0, pitch = 0, rollNow = 0, pitchNow = 0;      // degrees: latest from the robot, and drawn
   let newsAt = 0, lastFrame = 0, frame = 0, small = false;
   const pos = new THREE.Vector2();              // how far the floor has slid (x, z), metres
 
@@ -113,16 +124,22 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     draw();
   }
 
-  function showWall() {
-    const cm = distance;
-    if (cm === null || cm > SEE_CM) { wall.visible = false; return; }
-    wall.visible = true;
-    // closer than real, so it fits in the picture: 30 cm away is drawn at the edge of the view
-    const gap = gapMax() * Math.min(cm, SLOW_CM) / SLOW_CM;
-    wall.position.set(0, 0.03, NOSE + 0.006 + gap);
-    wallMat.opacity = 0.75 * Math.min(1, (SEE_CM - cm) / (SEE_CM - SLOW_CM) + 0.15);
-    wallMat.color.set(blocked || cm < STOP_CM ? 0xff3b3b : cm < SLOW_CM ? 0xffd23f : 0xdfe6ff);
-    wallMat.emissive.copy(wallMat.color).multiplyScalar(0.35);
+  function showWalls() {
+    const step = Math.tan(THREE.MathUtils.degToRad(ZONE_DEG / 2)) * 2;
+    walls.forEach((wall, i) => {
+      const cm = zones[i];
+      if (cm === null || cm > SEE_CM) { wall.visible = false; return; }
+      wall.visible = true;
+      // closer than real, so it fits in the picture: 30 cm away is drawn at the edge of the view
+      const r = NOSE + 0.006 + gapMax() * Math.min(cm, SLOW_CM) / SLOW_CM;
+      const a = wall.rotation.y;
+      wall.position.set(Math.sin(a) * r, 0.03, Math.cos(a) * r);
+      wall.scale.x = r * step * 0.94;
+      const mat = wall.material, mid = i > 0 && i < 4;        // the bumper only looks at the middle three
+      mat.opacity = (mid ? 0.75 : 0.45) * Math.min(1, (SEE_CM - cm) / (SEE_CM - SLOW_CM) + 0.15);
+      mat.color.set(mid && (blocked || cm < STOP_CM) ? 0xff3b3b : cm < SLOW_CM ? 0xffd23f : 0xdfe6ff);
+      mat.emissive.copy(mat.color).multiplyScalar(0.35);
+    });
   }
 
   function draw() { renderer.render(scene, camera); }
@@ -145,7 +162,16 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     grid.position.x = -pos.x;
     grid.position.z = -pos.y;
     draw();
-    const settled = !speed && !turn && Math.abs(wrap(target - shown)) < 0.05;
+    // tilt: lean the way the real robot leans (picked up, on a ramp)
+    rollNow += (roll - rollNow) * Math.min(1, dt * 8);
+    pitchNow += (pitch - pitchNow) * Math.min(1, dt * 8);
+    gltf.scene.rotation.set(THREE.MathUtils.degToRad(pitchNow * PITCH_SIGN), 0, THREE.MathUtils.degToRad(rollNow * ROLL_SIGN));
+    gltf.scene.position.y = 0.02 * Math.min(1, (Math.abs(rollNow) + Math.abs(pitchNow)) / 30);   // lifts off the floor as it tips
+    // stopped by the bumper: the strips flash red, like the real lights
+    const dark = blocked && Math.floor(now / FLASH_MS) % 2;
+    [0, 1].forEach((i) => setLed(i, blocked ? (dark ? [0, 0, 0] : [1, 0, 0]) : lights[i]));
+    const settled = !speed && !turn && !blocked && Math.abs(wrap(target - shown)) < 0.05
+      && Math.abs(roll - rollNow) + Math.abs(pitch - pitchNow) < 0.2;
     if (!settled) run();
   }
   function run() {
@@ -162,20 +188,31 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       if (zero === null) { zero = t.heading; shown = 0; }
       target = wrap(t.heading - zero);
       speed = t.speed; turn = t.turn;
-      distance = t.distance; blocked = t.blocked;
-      setLed(0, t.left); setLed(1, t.right);
-      showWall();
+      blocked = t.blocked;
+      lights = [t.left, t.right];
+      if (!zoned) zones = [null, t.distance, t.distance, t.distance, null];   // older robot code: one distance
+      showWalls();
       newsAt = performance.now();
       if (!frame) lastFrame = newsAt;
       run();
     },
     /** The robot went away. The next one starts facing away from you again. */
     reset() {
-      zero = null; target = shown = 0; speed = turn = 0; distance = null; blocked = false;
-      [0, 1].forEach((i) => setLed(i, [0, 0, 0]));
-      showWall();
-      robot.rotation.y = 0;
-      draw();
+      zero = null; target = shown = 0; speed = turn = 0; blocked = false;
+      zones = [null, null, null, null, null]; zoned = false;
+      lights = [[0, 0, 0], [0, 0, 0]];
+      roll = pitch = 0;
+      showWalls();
+      run();
+    },
+    /** s = parsed sensors packet (telemetry.js): five distances, tilt. */
+    sensors(s) {
+      zones = s.zones; zoned = true;
+      // small leans are just the floor and the sensor's noise
+      roll = Math.abs(s.roll) < 4 ? 0 : Math.max(-60, Math.min(60, s.roll));
+      pitch = Math.abs(s.pitch) < 4 ? 0 : Math.max(-60, Math.min(60, s.pitch));
+      showWalls();
+      run();
     },
     /** Call the way the robot points right now "away from me". */
     recentre() {

@@ -2,9 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parseTelemetry, telemetryReader, telemetryRequest, TELEMETRY_LEN } from "../docs/telemetry.js";
+import { parseTelemetry, parseSensors, telemetryReader, telemetryRequest, TELEMETRY_LEN, SENSORS_LEN } from "../docs/telemetry.js";
 
-const vectors = JSON.parse(readFileSync(new URL("./telemetry_vectors.json", import.meta.url), "utf8"));
+const all = JSON.parse(readFileSync(new URL("./telemetry_vectors.json", import.meta.url), "utf8"));
+const vectors = all.filter((v) => v.robot), sensorVectors = all.filter((v) => v.sensors);
 const bytes = (hex) => Uint8Array.from(hex.match(/../g), (h) => parseInt(h, 16));
 
 test("parses the shared example packets", () => {
@@ -13,6 +14,25 @@ test("parses the shared example packets", () => {
     assert.equal(bytes(v.hex).length, TELEMETRY_LEN);
     assert.deepEqual(parseTelemetry(bytes(v.hex)), v.page, v.note);
   }
+});
+
+test("parses the shared sensors packets", () => {
+  assert.ok(sensorVectors.length >= 2);
+  for (const v of sensorVectors) {
+    assert.equal(bytes(v.hex).length, SENSORS_LEN);
+    assert.deepEqual(parseSensors(bytes(v.hex)), v.page, v.note);
+    assert.equal(parseTelemetry(bytes(v.hex)), null);
+  }
+});
+
+test("reader hands out both kinds, and an old page's reader would skip sensors", () => {
+  const got = [];
+  const feed = telemetryReader((t) => got.push(["T", t]), (s) => got.push(["S", s]));
+  feed([...bytes(vectors[0].hex), ...bytes(sensorVectors[0].hex), ...bytes(vectors[1].hex)]);
+  assert.deepEqual(got, [["T", vectors[0].page], ["S", sensorVectors[0].page], ["T", vectors[1].page]]);
+  const only = [];
+  telemetryReader((t) => only.push(t))([...bytes(sensorVectors[0].hex), ...bytes(vectors[1].hex)]);
+  assert.deepEqual(only, [vectors[1].page]);
 });
 
 test("rejects damaged, short and other packets", () => {

@@ -76,6 +76,8 @@ class FakeAlvik:
         self.stopped = False
         self.distance = lambda t: (None,) * 5
         self.heading = lambda t: 0
+        self.tilt = (0, 0)                 # roll, pitch
+        self.battery = 80
         self.left_led = Led(self, "L")
         self.right_led = Led(self, "R")
 
@@ -94,6 +96,8 @@ class FakeAlvik:
     def get_distance(self): return self.distance(CLOCK.now)
     def get_line_sensors(self): return (0, 0, 0)
     def get_pose(self): return (0, 0, self.heading(CLOCK.now))
+    def get_orientation(self): return self.tilt + (self.heading(CLOCK.now),)
+    def get_battery_charge(self): return self.battery
 
     def drive(self, linear, angular):
         self.drives.append((CLOCK.now, linear, angular))
@@ -491,7 +495,11 @@ class RemoteDriving(RobotTest):
         self.assertEqual(self.at(robot, 900)[0], rc.SPEED)
         self.assertAlmostEqual(self.at(robot, 1500)[0], rc.SPEED / 2)
         self.assertEqual(self.at(robot, 2040)[0], 0, "stops at once")
-        self.assertEqual(robot.colour_at(2500)[0], RED)
+        slowing = [rgb for t, side, rgb in robot.leds if side == "L" and 1000 < t < 2000]
+        self.assertEqual(set(slowing), {RED, WHITE}, "blinks red while slowing down")
+        stopped = [(t, rgb) for t, side, rgb in robot.leds if side == "L" and 2040 < t < 3000]
+        self.assertEqual({rgb for t, rgb in stopped}, {RED, OFF}, "flashes red when stopped")
+        self.assertGreater(len(stopped), 1.5 * len(slowing), "and faster")
         self.assertEqual(robot.colour_at(3800)[0], WHITE)
         self.assertGreater(self.at(robot, 3800)[0], 0, "drives on when the way is clear")
 
@@ -523,13 +531,14 @@ class Telemetry(RobotTest):
 
     def told(self, rc, t):
         """What the robot last said at or before time t."""
-        return read_telemetry([p for when, p in rc._link.sent if when <= t][-1])
+        return read_telemetry([p for when, p in rc._link.sent if when <= t and p[1:2] == b"T"][-1])
 
     def test_packets_match_the_shared_examples(self):
         import remote_control as rc
         with open(os.path.join(REPO, "tests", "telemetry_vectors.json")) as f:
             for case in json.load(f):
-                self.assertEqual(rc.telemetry_packet(**case["robot"]).hex(), case["hex"], case["note"])
+                pkt = rc.sensor_packet(**case["sensors"]) if "sensors" in case else rc.telemetry_packet(**case["robot"])
+                self.assertEqual(pkt.hex(), case["hex"], case["note"])
 
     def test_request_packet_is_parsed(self):
         import remote_control as rc
@@ -547,7 +556,7 @@ class Telemetry(RobotTest):
         robot, rc = self.drive([self.ASK, (0, ("J", 0, 100))] + [(t, ("J", 0, 100)) for t in range(150, 3000, 150)],
                                until=3000, heading=lambda t: 400 if t > 2000 else 12.34,
                                distance=lambda t: (3, None, 61.6, 80, 3))
-        times = [when for when, p in rc._link.sent]
+        times = [when for when, p in rc._link.sent if p[1:2] == b"T"]
         self.assertTrue(13 <= len(times) <= 16, len(times))
         self.assertTrue(all(b - a >= rc.TELEMETRY_MS for a, b in zip(times, times[1:])))
         t = self.told(rc, 1500)
@@ -567,6 +576,7 @@ class Telemetry(RobotTest):
         self.assertEqual(t["left"], RED, "button 1: white -> red")
         t = self.told(rc, 2900)
         self.assertEqual((t["blocked"], t["speed"], t["distance"]), (True, 0, 5))
+        self.assertIn(t["left"], (RED, OFF), "flashing")
         t = self.told(rc, 3800)
         self.assertEqual((t["bumper"], t["blocked"], t["speed"]), (False, False, rc.TURBO_SPEED))
 
@@ -579,6 +589,23 @@ class Telemetry(RobotTest):
         self.assertEqual(self.told(rc, 4300)["turn"], 360)
         t = self.told(rc, 5500)
         self.assertEqual((t["dancing"], t["left"], t["turn"]), (False, WHITE, 0))
+
+    def test_sensors_packet_follows_each_telemetry_packet(self):
+        def setup_distance(t):
+            return (40, None, 12.4, 300, 7)
+        import remote_control
+        remote_control._link = TimedLink([self.ASK])
+        robot = FakeAlvik()
+        robot.distance, robot.tilt, robot.battery = setup_distance, (-12.4, 30.6), 67
+        robot.presses = [(1000, 10 ** 9, "cancel")]
+        remote_control.run_remote(robot)
+        kinds = [p[1:2] for when, p in remote_control._link.sent]
+        self.assertEqual(kinds[:4], [b"T", b"S", b"T", b"S"])
+        s = remote_control._link.sent[1][1]
+        self.assertEqual(len(s), 11)
+        self.assertEqual((~sum(s[:10])) & 0xFF, s[10])
+        self.assertEqual(list(s[2:7]), [40, 255, 12, 254, 7])
+        self.assertEqual((s[7] - 256, s[8], s[9]), (-12, 31, 67))
 
     def test_a_new_phone_has_to_ask_again(self):
         robot, rc = self.drive([self.ASK, (1000, "lost")], until=3000)

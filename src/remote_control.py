@@ -13,6 +13,7 @@
 # in front, its lights and speed, about 5 times a second, for the 3D robot on the page.
 #
 # Lights while in this mode: yellow = waiting for a phone, then your headlight colour.
+# With the bumper on they blink red as it slows down for something, and flash fast when it stops.
 # Press the robot's X (cancel) touch button to go back to the menu.
 
 import bluetooth
@@ -32,6 +33,8 @@ ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
 STICK_TIMEOUT_MS = 600   # joystick goes quiet for this long -> stop (the page froze or went away)
+SLOW_FLASH_MS = 300      # lights blink red this slowly while the bumper is slowing the robot down
+STOP_FLASH_MS = 120      # and this fast once it has stopped it
 TELEMETRY_MS = 200       # how often the web page is told what the robot is doing (when it asked)
 COLORS = [(1, 1, 1), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 0), (0, 0, 0)]
 # the dance itself (lights, wiggle, spin) is in dance.py
@@ -149,6 +152,19 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
     return body + bytes(((~sum(body)) & 0xFF,))
 
 
+def sensor_packet(distances, roll, pitch, battery):
+    """The other sensors, sent right after telemetry_packet (docs/telemetry.js reads it).
+    11 bytes:  '!' 'S' <5 distances> <roll> <pitch> <battery> <checksum>
+      distances  cm, the five readings from left to right, 0..254; 255 = nothing seen
+      roll, pitch  int8, whole degrees, as the IMU reports them
+      battery    0..100 percent; 255 = not known"""
+    d = [255 if x is None else max(0, min(254, int(round(x)))) for x in tuple(distances)[:5]]
+    d += [255] * (5 - len(d))
+    b = 255 if battery is None else max(0, min(100, int(battery)))
+    body = bytes([0x21, 83] + d + [_int8(roll or 0, 1), _int8(pitch or 0, 1), b])
+    return body + bytes(((~sum(body)) & 0xFF,))
+
+
 class PhoneLink:
     def __init__(self, name):
         self.ble = bluetooth.BLE()
@@ -228,6 +244,8 @@ def run_remote(alvik):
     dancing = False
     was_connected = False
     blocked = False
+    warn = 0              # bumper: 0 clear, 1 slowing down, 2 stopped
+    warn_at = 0
     stick = (0, 0)        # joystick from the web page: (x right, y forward), each -100..100
     stick_at = 0
     linear = angular = 0  # what the wheels are doing now (ramps towards what's asked for)
@@ -311,15 +329,25 @@ def run_remote(alvik):
             angular = ramp(angular, want_angular, TURN_ACCEL * dt, TURN_ACCEL * dt)
 
         # bumper: slow down near things, and don't drive forward into them
-        now_blocked = False
+        level = 0
         if bumper and (linear > 0 or want_linear > 0):
-            limit = bumper_limit(alvik.get_distance(), TURBO_SPEED if turbo else SPEED)
+            top = TURBO_SPEED if turbo else SPEED
+            limit = bumper_limit(alvik.get_distance(), top)
             if linear > limit:
                 linear = limit             # right away, no ramp
-            now_blocked = limit == 0
-        if now_blocked != blocked:
-            lit = _lights(alvik, (1, 0, 0) if now_blocked else COLORS[color_i])
-            blocked = now_blocked
+            level = 2 if limit == 0 else 1 if limit < top else 0
+        if level != warn:
+            if not level:                  # all clear: headlights back
+                lit = _lights(alvik, COLORS[color_i])
+            warn = level
+            warn_at = now
+        blocked = level == 2
+        if level:                          # blink red: slowly while slowing, fast when stopped
+            red = (ticks_diff(now, warn_at) // (STOP_FLASH_MS if blocked else SLOW_FLASH_MS)) % 2 == 0
+            other = (0, 0, 0) if blocked or COLORS[color_i] == (1, 0, 0) else COLORS[color_i]
+            show = (1, 0, 0) if red else other
+            if show != lit:
+                lit = _lights(alvik, show)
 
         alvik.drive(linear, angular)
 
@@ -329,6 +357,8 @@ def run_remote(alvik):
             _link.send(telemetry_packet(
                 alvik.get_pose()[2], front_distance(alvik.get_distance()), left, right,
                 linear, angular, turbo, bumper, blocked, bool(move)))
+            roll, pitch, _ = alvik.get_orientation()
+            _link.send(sensor_packet(alvik.get_distance(), roll, pitch, alvik.get_battery_charge()))
         sleep_ms(30)
 
     alvik.brake()
