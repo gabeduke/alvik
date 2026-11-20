@@ -16,7 +16,7 @@ export const SLOW_CM = 14;                      // start slowing down when somet
 export const FLOOR_SLACK_CM = 2;                // once a zone has learnt where the floor shows, readings this close to it are floor too
 export const FLOOR_PROOF_CM = 4;                // drive this far at a thing: if it came no closer, it was the floor all along
 export const CLOSER_CM = 1.5;                   // a reading has to drop by this much to count as "came closer"
-export const SURE = 5;                          // a thing has to show in this many readings in a row to count
+export const SURE = 3;                          // a thing has to show in this many new readings in a row to count
 export const ACCEL = 30, DECEL = 60;            // cm/s per second: speeding up gently, slowing down quicker
 export const TURN_ACCEL = 540;                  // deg/s per second
 
@@ -79,13 +79,23 @@ export class Zone {
 export class Bumper {
   constructor() {
     this.zones = [new Zone(), new Zone(), new Zone()];
+    this.last = null;           // the readings the zones last looked at (the sensor repeats itself between new ones)
+    this.moved = 0;             // cm driven since then
+    this.ahead = null;
   }
 
   /** distances = the sensor's five readings, left to right; moved = cm driven forward since the last
-   *  look. Returns cm to what is ahead, or null. */
+   *  look. Returns cm to what is ahead, or null. Only new readings count. */
   look(distances, moved = 0) {
-    const near = this.zones.map((zone, i) => zone.see(distances[i + 1] ?? null, moved))
-      .filter((d) => d !== null).sort((a, b) => a - b);
-    return near.length >= 2 ? near[1] : null;
+    this.moved += moved;
+    const key = JSON.stringify(distances.map((d) => d ?? null));
+    if (key !== this.last) {
+      this.last = key;
+      const near = this.zones.map((zone, i) => zone.see(distances[i + 1] ?? null, this.moved))
+        .filter((d) => d !== null).sort((a, b) => a - b);
+      this.moved = 0;
+      this.ahead = near.length >= 2 ? near[1] : null;
+    }
+    return this.ahead;
   }
 }

@@ -96,7 +96,11 @@ class FakeAlvik:
     def get_touch_down(self): return self._touch("down")
     def get_touch_left(self): return self._touch("left")
     def get_touch_right(self): return self._touch("right")
-    def get_distance(self): return self.distance(CLOCK.now)
+    FRAME_MS = 60                         # like the real sensor: new readings now and then, the same ones in between
+
+    def get_distance(self):
+        frame = CLOCK.now // self.FRAME_MS                              # and they are never quite the same twice
+        return tuple(None if d is None else d + 0.1 * (frame % 2) for d in self.distance(frame * self.FRAME_MS))
     def get_line_sensors(self): return self.lines
     def get_color(self, color_format="rgb"):
         if self.colour == "broken":        # a calibration with white = black: the library divides by zero
@@ -557,15 +561,15 @@ class RemoteDriving(RobotTest):
         return (far or 16 + wobble, 18.2 - wobble, far or 16.5 + wobble / 2, 17.3, 180)
 
     # A shiny kitchen table: the table where the floor would be, plus stray reflections. One zone at a
-    # time often reads something close for a while, and now and then all of them dip for a moment
-    # (the nose dipping as it speeds up or slows down).
+    # time often reads something close for a while, and now and then all of them dip for one set of
+    # readings (the nose dipping as it speeds up or slows down).
     @classmethod
     def kitchen_table(cls, t):
         zones = list(cls.open_floor(t))
-        n = t // 30
-        if n % 40 < 10:                               # a reflection in one zone, a third of a second long
-            zones[1 + (n // 40) % 3] = 6 + (n % 7)
-        if n % 53 < 3:                                # everything dips for three readings
+        n = t // 60                                   # sets of readings
+        if n % 20 < 6:                                # a reflection in one zone, a third of a second long
+            zones[1 + (n // 20) % 3] = 6 + (n % 7)
+        if n % 27 == 0:                               # everything dips, once
             zones[1:4] = [12.5, 13, 12]
         return tuple(zones)
 
@@ -639,7 +643,7 @@ class FloorOrThing(RobotTest):
 
     def test_a_blip_is_not_a_thing(self):
         zone, rc = self.zone()
-        self.assertEqual([zone.see(d) for d in (17, 9, 9, 9, 17, 6, 6, 17)], [None] * 8)
+        self.assertEqual([zone.see(d) for d in (17, 9, 9, 17, 6, 17)], [None] * 6)
         self.assertEqual([zone.see(9) for _ in range(rc.SURE + 1)], [None] * (rc.SURE - 1) + [9, 9], "but it is once it stays")
 
     def test_standing_still_nothing_is_decided(self):
@@ -654,7 +658,7 @@ class FloorOrThing(RobotTest):
         self.assertLessEqual(gone * 0.2, rc.FLOOR_PROOF_CM + 1.5, "let go after driving this far")
         self.assertEqual(set(seen[gone:]), {None}, "and it stays the floor")
         self.assertIsNone(zone.see(11.5), "standing still too")
-        self.assertEqual([zone.see(d, 0.2) for d in (9.5, 9.3, 9.1, 8.9, 8.7)], [None] * 4 + [8.7],
+        self.assertEqual([zone.see(d, 0.2) for d in (9.5, 9.3, 9.1, 8.9, 8.7)][rc.SURE - 2:], [None, 9.1, 8.9, 8.7],
                          "something nearer than that floor is a thing")
         zone.see(17)
         self.assertEqual([zone.see(12) for _ in range(rc.SURE)][-1], 12, "seeing past it forgets it")
@@ -669,8 +673,9 @@ class WhatIsAhead(RobotTest):
 
     def settle(self, distances, looks=20):
         import remote_control as rc
-        eyes = rc.Bumper()
-        return [eyes.look(distances) for _ in range(looks)][-1], rc
+        eyes = rc.Bumper()                     # new readings each time, never quite the same
+        jitter = lambda i: tuple(None if d is None else d + 0.1 * (i % 2) for d in distances)
+        return [eyes.look(jitter(i)) for i in range(looks)][-1], rc
 
     def test_nothing_or_the_floor_is_nothing(self):
         for distances in ((None,) * 5, (140, 115, 108, 101, 83), (16.5, 16.8, 17.1, 17.4, 180), (5, 200, 200, 200, 5)):
@@ -681,15 +686,21 @@ class WhatIsAhead(RobotTest):
             self.assertIsNone(self.settle(distances)[0], distances)
 
     def test_two_zones_or_three_count(self):
-        self.assertEqual(self.settle((None, 12, 10, 17, None))[0], 12, "the further of the two")
-        self.assertEqual(self.settle((None, 13, 9, 11, None))[0], 11, "the middle of three")
+        self.assertAlmostEqual(self.settle((None, 12, 10, 17, None))[0], 12, delta=0.15, msg="the further of the two")
+        self.assertAlmostEqual(self.settle((None, 13, 9, 11, None))[0], 11, delta=0.15, msg="the middle of three")
         ahead, rc = self.settle((None, 7, 7.5, 7, None))
         self.assertEqual(rc.bumper_limit(ahead, rc.SPEED), 0)
 
     def test_the_kitchen_table_changes_nothing(self):
         import remote_control as rc
         eyes = rc.Bumper()
-        self.assertEqual({eyes.look(RemoteDriving.kitchen_table(t), 0.24) for t in range(0, 20000, 30)}, {None})
+        self.assertEqual({eyes.look(RemoteDriving.kitchen_table(t // 60 * 60), 0.24) for t in range(0, 20000, 30)}, {None})
+
+    def test_the_same_readings_again_are_not_new(self):
+        import remote_control as rc
+        eyes = rc.Bumper()                     # one bad set of readings, read ten times round the loop
+        self.assertEqual({eyes.look(r) for r in [(None, 9, 9, 9, None)] * 10 + [(None, 17, 17.2, 16.9, None)] * 3}, {None})
+        self.assertIsNotNone([eyes.look((None, 9 + i % 2 / 10, 9, 9, None)) for i in range(rc.SURE)][-1], "new ones count")
 
 
 class SharedSums(RobotTest):
@@ -708,12 +719,12 @@ class SharedSums(RobotTest):
                 for i in range(140)]
         table = [[[d if not (i % 40 < 10 and z == 1 + (i // 40) % 3) else 6 + i % 7 for z, d in enumerate(floor(i))], step]
                  for i in range(160)]
-        dips = [[floor(i)[:1] + ([12.5, 13, 12] if i % 20 < 3 else floor(i)[1:4]) + [180], step] for i in range(80)]
+        dips = [[floor(i)[:1] + ([12.5, 13, 12] if i % 20 < 2 else floor(i)[1:4]) + [180], step] for i in range(80)]
         leg = [[[None, 17, 30 - i * step, 17, None], step] for i in range(100)]
         nose_down = [[[None, 12 + wobble(i) / 5, 12, 12 - wobble(i) / 5, None], step] for i in range(60)]
         turn = [[[None, 11, 11, 11, None], 0]] * 12 + [[floor(i), 0] for i in range(12)]
         looks = [("driving up to a wall", wall), ("a kitchen table: one zone at a time sees a reflection", table),
-                 ("all zones dip for a moment", dips), ("a chair leg dead ahead", leg),
+                 ("all zones dip for two readings", dips), ("a chair leg dead ahead", leg),
                  ("nose down: it shows closer, and comes no closer", nose_down), ("turning away from a wall onto open floor", turn)]
         zones = [("a wall driven up to", [[30 - i * step, step] for i in range(100)]),
                  ("the floor, standing still then driving", [[17 + wobble(i), step if i > 20 else 0] for i in range(80)]),
@@ -749,7 +760,7 @@ class SharedSums(RobotTest):
         by = {scene["note"]: scene["ahead"] for scene in now["looks"]}
         self.assertLess(by["driving up to a wall"][-1], rc.BUMPER_CM)
         self.assertEqual(set(by["a kitchen table: one zone at a time sees a reflection"]), {None})
-        self.assertEqual(set(by["all zones dip for a moment"]), {None})
+        self.assertEqual(set(by["all zones dip for two readings"]), {None})
         self.assertEqual(set(by["a chair leg dead ahead"]), {None})
         self.assertIsNone(by["nose down: it shows closer, and comes no closer"][-1])
         self.assertIsNone(by["turning away from a wall onto open floor"][-1])

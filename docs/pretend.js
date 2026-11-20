@@ -41,6 +41,7 @@ const EYE_X = 1.3, EYE_Y = 3.6;                  // the line sensors: apart, and
 // ---------- readings (guesses that copy the real robot) ----------
 const SEES_CM = 60;                              // a thing further off than this loses to the floor
 const FLOOR_SHOWS = [16, 18];                    // cm: where the floor shows with nothing ahead
+const FRAME_MS = 60;                             // the sensor makes new readings this often; in between it says the same again
 const BLIP_CHANCE = 0.02;                        // per reading: a zone drops to the floor's reading for a moment
 const UNDER_CM = 7.4, HELD_CM = 42;              // the low zone: standing on the floor, and held in the air
 const LINE_PALE = 50, LINE_DARK = 720, LINE_AIR = 900;
@@ -137,7 +138,7 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
   let linear = 0, angular = 0, telemetry = false, toldAt = -TELEMETRY_MS;
   let warn = 0, warnAt = 0, blocked = false, flashUntil = -1;
   let danceAt = null, lit = [COLORS[0], COLORS[0]];
-  let eyes = new Bumper(), buf = [], seen = [null, null, null, null, null], ahead = null;
+  let eyes = new Bumper(), buf = [], seen = [null, null, null, null, null], ahead = null, frameAt = -FRAME_MS;
   const blips = [0, 0, 0, 0, 0];                 // readings left in each zone's blip
   const noise = (size) => (random() - 0.5) * 2 * size;
 
@@ -227,7 +228,7 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
       now += ms;
       if ((stick[0] || stick[1]) && now - stickAt > STICK_TIMEOUT_MS) stick = [0, 0];   // the page went quiet
 
-      seen = distances();
+      if (now - frameAt >= FRAME_MS) { frameAt = now; seen = distances(); }
       ahead = eyes.look(seen, linear * dt);
 
       const base = COLORS[colorI];

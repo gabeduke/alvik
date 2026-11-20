@@ -34,7 +34,7 @@ SLOW_CM = 14         # start slowing down when something is closer than this. Wi
 FLOOR_SLACK_CM = 2   # once a zone has learnt where the floor shows, readings this close to it are floor too
 FLOOR_PROOF_CM = 4   # drive this far at a thing: if it came no closer, it was the floor all along
 CLOSER_CM = 1.5      # a reading has to drop by this much to count as "came closer" (less is noise)
-SURE = 5             # a thing has to show in this many readings in a row to count (about 0.15 s)
+SURE = 3             # a thing has to show in this many new readings in a row to count (one bad one is a blip)
 ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
@@ -129,7 +129,7 @@ class Zone:
     The sensor looks a little downwards, so with nothing ahead it sees the floor 16-18 cm away.
     SLOW_CM is under that, so the floor is nothing. A reading only counts as a thing when:
       - it is closer than SLOW_CM (and closer than a floor this zone has learnt, see below), and
-      - it shows SURE times in a row: the sensor blips, and a single blip is not a thing.
+      - it shows in SURE new readings in a row: the sensor blips, and a single blip is not a thing.
     If the robot drives FLOOR_PROOF_CM at a thing and it comes no closer, it was the floor after
     all (a nose-down robot, a bump in the table): from then on readings near it are floor too,
     until the zone sees past SLOW_CM again."""
@@ -167,17 +167,29 @@ class Bumper:
 
     So two zones out of three have to see a thing before the robot slows down. One zone's stray
     reflection does nothing, and a wall or a box counts. (Something narrow, like a chair leg, fills
-    one zone only: the robot bumps into it.)"""
+    one zone only: the robot bumps into it.)
+    The sensor makes a new set of readings only every 30 to 300 ms, and get_distance() gives the
+    same ones again in between. So the zones only look when the readings change: one bad set of
+    readings is one blip, however many times round the loop it is read."""
 
     def __init__(self):
         self.zones = [Zone(), Zone(), Zone()]
+        self.last = None        # the readings the zones last looked at
+        self.moved = 0          # cm driven since then
+        self.ahead = None
 
     def look(self, distances, moved=0):
         """distances = the sensor's five readings, left to right; moved = cm driven forward since the
         last look. Returns cm to what is ahead, or None."""
-        seen = [zone.see(d, moved) for zone, d in zip(self.zones, distances[1:4])]
-        near = sorted(d for d in seen if d is not None)
-        return near[1] if len(near) >= 2 else None
+        self.moved += moved
+        distances = tuple(distances)
+        if distances != self.last:                      # new readings
+            self.last = distances
+            seen = [zone.see(d, self.moved) for zone, d in zip(self.zones, distances[1:4])]
+            self.moved = 0
+            near = sorted(d for d in seen if d is not None)
+            self.ahead = near[1] if len(near) >= 2 else None
+        return self.ahead
 
 
 def _int8(v, scale):

@@ -48,7 +48,7 @@ test("the numbers the lessons quote are still the robot's numbers", () => {
   // Changed one of these in the robot's code? Then say so in the lesson named here too.
   const quoted = {
     "src/remote_control.py": ["SPEED = 8 ", "TURBO_SPEED = 13 ", "ACCEL = 30 ", "DECEL = 60 ", "STICK_TIMEOUT_MS = 600 ", "TELEMETRY_MS = 100 ",
-      "BUMPER_CM = 8 ", "SLOW_CM = 14 ", "FLOOR_PROOF_CM = 4 ", "SURE = 5 "],
+      "BUMPER_CM = 8 ", "SLOW_CM = 14 ", "FLOOR_PROOF_CM = 4 ", "SURE = 3 "],
     "src/demo.py": ["START = 1 ", "PAGE = 6 ", "((1, 0, 1), run_remote)"],
     "src/hand_follower.py": ["reference = 10.0"],
     "docs/index.html": ["const DEAD = 0.18;", "now - sentAt > 150"],
@@ -77,8 +77,8 @@ test("the code the lessons show is the real code", () => {
   const quotes = {
     "2-drive.html": ["src/remote_control.py", ["        pkt = buf[i:i + 5]", "        if (~sum(pkt[:4])) & 0xFF != pkt[4]:"]],
     "3-smooth.html": ["src/remote_control.py", ["            linear = ramp(linear, want_linear, ACCEL * dt, DECEL * dt)", "        if stick != (0, 0) and ticks_diff(now, stick_at) > STICK_TIMEOUT_MS:"]],
-    "6-bumper.html": ["src/remote_control.py", ["        seen = [zone.see(d, moved) for zone, d in zip(self.zones, distances[1:4])]",
-      "        near = sorted(d for d in seen if d is not None)", "        return near[1] if len(near) >= 2 else None"]],
+    "6-bumper.html": ["src/remote_control.py", ["            seen = [zone.see(d, self.moved) for zone, d in zip(self.zones, distances[1:4])]",
+      "            near = sorted(d for d in seen if d is not None)", "            self.ahead = near[1] if len(near) >= 2 else None"]],
   };
   for (const [lesson, [file, lines]] of Object.entries(quotes)) {
     const real = code(file), shown = plain(read("docs", "learn", lesson)).split("\n").map((l) => l.replace(/\s+#.*$/, "").trim());

@@ -75,7 +75,7 @@ test("says nothing until the page asks, then three packets about eight times a s
   assert.deepEqual([t.heading, t.speed, t.turn, t.turbo, t.bumper, t.blocked], [0, 0, 0, false, true, false]);
   assert.deepEqual(t.left, [1, 1, 1]);
   assert.equal(r.got.S.at(-1).battery, 87);
-  assert.equal(r.got.U.at(-1).bottom, 7);
+  assert.ok([7, 8].includes(r.got.U.at(-1).bottom), "about 7.4 cm to the floor");
 });
 
 test("the joystick drives it, gently, and it stops when the page goes quiet", () => {
@@ -127,11 +127,15 @@ test("bumper off: it drives into the box and stays outside it", () => {
 test("a chair leg in one zone does not slow it; it only stops once two zones see the leg, very close", () => {
   const post = ROOM.posts[0];
   const r = robot({ ...ROOM, start: { x: post.x, y: post.y - 36 }, tape: [], mats: [] });
-  r.driving(0, 100, 3500);                       // by now a wall would have had it crawling
-  assert.ok(r.view().linear > 4 && r.got.T.every((t) => !t.blocked && (t.distance === null || t.distance > 15)), "one zone alone is nothing");
-  r.driving(0, 100, 8000);
-  const gap = post.y - post.r - (r.view().y + 4.8);
-  assert.ok(gap > 2 && gap < 6, `ends ${gap.toFixed(1)} cm from the leg`);
+  const gap = () => post.y - post.r - (r.view().y + 4.8);
+  let slowedAt = null;
+  r.run(8000, (t) => {
+    if (t % 150 === 0) r.stick(0, 100);
+    if (slowedAt === null && r.view().linear < 8 && t > 1000) slowedAt = gap();
+  });
+  assert.ok(slowedAt !== null && slowedAt < 9, `full speed until ${slowedAt?.toFixed(1)} cm from the leg: one zone alone is nothing`);
+  const end = gap();
+  assert.ok(end > 2 && end < 6, `ends ${end.toFixed(1)} cm from the leg`);
 });
 
 test("line sensors read dark over the tape, and the floor's colour changes on a mat", () => {
@@ -183,7 +187,7 @@ test("picked up: the floor falls away, it tips, the wheels turn it but it goes n
   assert.ok(Math.abs(s.pitch) >= 8 && s.zones.every((z) => z === null));
   r.hold(false);
   r.run(300);
-  assert.equal(r.got.U.at(-1).bottom, 7);
+  assert.ok([7, 8].includes(r.got.U.at(-1).bottom), "about 7.4 cm to the floor");
 });
 
 test("rays stop at walls, boxes and posts", () => {
