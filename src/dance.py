@@ -21,6 +21,7 @@ class Dance:
         self.alvik = alvik
         self.start = None     # None = not dancing
         self.beat = -1
+        self.lights = ((0, 0, 0), (0, 0, 0))   # (left, right) colours of the current beat
 
     def begin(self):
         self.start = ticks_ms()
@@ -41,8 +42,9 @@ class Dance:
         beat = t // BEAT_MS
         if beat != self.beat:          # left and right get different colours
             self.beat = beat
-            self.alvik.left_led.set_color(*DISCO[beat % len(DISCO)])
-            self.alvik.right_led.set_color(*DISCO[(beat + 3) % len(DISCO)])
+            self.lights = (DISCO[beat % len(DISCO)], DISCO[(beat + 3) % len(DISCO)])
+            self.alvik.left_led.set_color(*self.lights[0])
+            self.alvik.right_led.set_color(*self.lights[1])
         if DANCE_MS - t < 1000:
             return 0, SPIN
         return 0, WIGGLE if (beat // 2) % 2 == 0 else -WIGGLE

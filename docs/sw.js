@@ -11,7 +11,8 @@
 const BUILD = "__BUILD__";
 const CACHE = "alvik-" + BUILD;
 const SHELL = [
-  "./", "flash.html", "pwa.js", "flasher.js",
+  "./", "flash.html", "pwa.js", "flasher.js", "telemetry.js", "twin.js", "models/alvik.glb",
+  "vendor/three/three.module.min.js", "vendor/three/loaders/GLTFLoader.js", "vendor/three/utils/BufferGeometryUtils.js",
   "manifest.webmanifest", "favicon.svg", "icons/icon-192.png", "icons/icon-512.png",
 ];
 

@@ -1,0 +1,222 @@
+[
+ {
+  "note": "standing still, white lights, nothing in front",
+  "robot": {
+   "heading": 0,
+   "distance": null,
+   "left": [
+    1,
+    1,
+    1
+   ],
+   "right": [
+    1,
+    1,
+    1
+   ],
+   "linear": 0,
+   "angular": 0,
+   "turbo": false,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  },
+  "hex": "21540000ff3f0000024a",
+  "page": {
+   "heading": 0,
+   "distance": null,
+   "left": [
+    1,
+    1,
+    1
+   ],
+   "right": [
+    1,
+    1,
+    1
+   ],
+   "speed": 0,
+   "turn": 0,
+   "turbo": false,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  }
+ },
+ {
+  "note": "driving forward on turbo, wall at 23 cm",
+  "robot": {
+   "heading": 12.3,
+   "distance": 23.4,
+   "left": [
+    0,
+    0,
+    1
+   ],
+   "right": [
+    0,
+    0,
+    1
+   ],
+   "linear": 13,
+   "angular": 0,
+   "turbo": true,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  },
+  "hex": "21547b00172441000390",
+  "page": {
+   "heading": 12.3,
+   "distance": 23,
+   "left": [
+    0,
+    0,
+    1
+   ],
+   "right": [
+    0,
+    0,
+    1
+   ],
+   "speed": 13,
+   "turn": 0,
+   "turbo": true,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  }
+ },
+ {
+  "note": "blocked: red lights, turned right",
+  "robot": {
+   "heading": -90,
+   "distance": 8,
+   "left": [
+    1,
+    0,
+    0
+   ],
+   "right": [
+    1,
+    0,
+    0
+   ],
+   "linear": 0,
+   "angular": -90,
+   "turbo": false,
+   "bumper": true,
+   "blocked": true,
+   "dancing": false
+  },
+  "hex": "21547cfc080900e20619",
+  "page": {
+   "heading": -90,
+   "distance": 8,
+   "left": [
+    1,
+    0,
+    0
+   ],
+   "right": [
+    1,
+    0,
+    0
+   ],
+   "speed": 0,
+   "turn": -90,
+   "turbo": false,
+   "bumper": true,
+   "blocked": true,
+   "dancing": false
+  }
+ },
+ {
+  "note": "dancing: two colours, spinning, bumper off, heading past half a turn wraps",
+  "robot": {
+   "heading": 541.5,
+   "distance": 300,
+   "left": [
+    1,
+    0,
+    1
+   ],
+   "right": [
+    0,
+    1,
+    0
+   ],
+   "linear": 0,
+   "angular": 360,
+   "turbo": false,
+   "bumper": false,
+   "blocked": false,
+   "dancing": true
+  },
+  "hex": "215407f9fe15007808f7",
+  "page": {
+   "heading": -178.5,
+   "distance": 254,
+   "left": [
+    1,
+    0,
+    1
+   ],
+   "right": [
+    0,
+    1,
+    0
+   ],
+   "speed": 0,
+   "turn": 360,
+   "turbo": false,
+   "bumper": false,
+   "blocked": false,
+   "dancing": true
+  }
+ },
+ {
+  "note": "reversing while turning left; heading -180 stays -180",
+  "robot": {
+   "heading": -180,
+   "distance": 0,
+   "left": [
+    0,
+    0,
+    0
+   ],
+   "right": [
+    1,
+    1,
+    0
+   ],
+   "linear": -8,
+   "angular": 45,
+   "turbo": false,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  },
+  "hex": "2154f8f80018d80f0299",
+  "page": {
+   "heading": -180,
+   "distance": 0,
+   "left": [
+    0,
+    0,
+    0
+   ],
+   "right": [
+    1,
+    1,
+    0
+   ],
+   "speed": -8,
+   "turn": 45,
+   "turbo": false,
+   "bumper": true,
+   "blocked": false,
+   "dancing": false
+  }
+ }
+]

@@ -9,6 +9,9 @@
 #   3      : disco dance (flashing lights, wiggle, then a spin)
 #   4      : bumper on / off (stops before driving into things — on by default)
 #
+# The web remote also asks for telemetry (see telemetry_packet): where the robot is pointing, what is
+# in front, its lights and speed, about 5 times a second, for the 3D robot on the page.
+#
 # Lights while in this mode: yellow = waiting for a phone, then your headlight colour.
 # Press the robot's X (cancel) touch button to go back to the menu.
 
@@ -29,6 +32,7 @@ ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
 STICK_TIMEOUT_MS = 600   # joystick goes quiet for this long -> stop (the page froze or went away)
+TELEMETRY_MS = 200       # how often the web page is told what the robot is doing (when it asked)
 COLORS = [(1, 1, 1), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 0), (0, 0, 0)]
 # the dance itself (lights, wiggle, spin) is in dance.py
 
@@ -51,6 +55,7 @@ def parse_packets(buf, events):
     Control Pad button:  '!' 'B' <'1'-'8'> <'1' down/'0' up> <checksum>  -> (button, pressed)
     Joystick (web page): '!' 'J' <x> <y> <checksum>                       -> ("J", x, y)
     x and y are signed bytes, -100..100: x right, y forward.
+    Telemetry (web page): '!' 'T' <'1' on/'0' off> <anything> <checksum>   -> ("T", on)
     Checksum = ~(sum of the first 4 bytes) & 0xFF."""
     while True:
         i = buf.find(b"!")
@@ -59,7 +64,7 @@ def parse_packets(buf, events):
         if len(buf) - i < 2:
             return buf[i:]
         kind = buf[i + 1]
-        if kind != 66 and kind != 74:          # not 'B' or 'J'
+        if kind != 66 and kind != 74 and kind != 84:   # not 'B', 'J' or 'T'
             buf = buf[i + 1:]
             continue
         if len(buf) - i < 5:
@@ -71,6 +76,8 @@ def parse_packets(buf, events):
         buf = buf[i + 5:]
         if kind == 66:
             events.append((pkt[2] - 48, pkt[3] == 49))
+        elif kind == 84:
+            events.append(("T", pkt[2] == 49))
         else:
             events.append(("J", _stick(pkt[2]), _stick(pkt[3])))
 
@@ -95,18 +102,51 @@ def ramp(now, want, step_up, step_down):
     return now + step_up if want > now else now - step_up
 
 
+def front_distance(distances):
+    """Closest thing straight ahead in cm (the middle three of the five readings), or None."""
+    front = [x for x in distances[1:4] if x is not None]
+    return min(front) if front else None
+
+
 def bumper_limit(distances, speed):
     """Fastest we may go forward given what's in front: full speed beyond SLOW_CM,
     slower as it gets closer, 0 inside BUMPER_CM."""
-    front = [x for x in distances[1:4] if x is not None]
-    if not front:
+    d = front_distance(distances)
+    if d is None:
         return speed
-    d = min(front)
     if d < BUMPER_CM:
         return 0
     if d >= SLOW_CM:
         return speed
     return max(2, speed * (d - BUMPER_CM) / (SLOW_CM - BUMPER_CM))
+
+
+def _int8(v, scale):
+    v = int(round(v * scale))
+    return max(-127, min(127, v)) & 0xFF
+
+
+def telemetry_packet(heading, distance, left, right, linear, angular,
+                     turbo=False, bumper=True, blocked=False, dancing=False):
+    """What the robot is doing, for the 3D robot on the web remote (docs/telemetry.js reads it).
+    10 bytes:  '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
+      heading   int16, tenths of a degree, -1800..1799; turning left counts up
+      distance  cm to the closest thing in front, 0..254; 255 = nothing seen
+      lights    bit 0-2 = left LED red, green, blue; bit 3-5 = right LED
+      speed     int8, 0.2 cm/s steps (forward is positive)
+      turn      int8, 3 deg/s steps (left is positive)
+      flags     bit 0 turbo, 1 bumper, 2 blocked by the bumper, 3 dancing
+    Checksum as for the other packets: ~(sum of the bytes before it) & 0xFF."""
+    h = int(round((heading or 0) * 10))
+    h = ((h + 1800) % 3600 - 1800) & 0xFFFF
+    d = 255 if distance is None else max(0, min(254, int(round(distance))))
+    lights = 0
+    for i, on in enumerate(tuple(left) + tuple(right)):
+        if on:
+            lights |= 1 << i
+    flags = (1 if turbo else 0) | (2 if bumper else 0) | (4 if blocked else 0) | (8 if dancing else 0)
+    body = bytes((0x21, 84, h & 0xFF, h >> 8, d, lights, _int8(linear, 5), _int8(angular, 1 / 3), flags))
+    return body + bytes(((~sum(body)) & 0xFF,))
 
 
 class PhoneLink:
@@ -140,6 +180,15 @@ class PhoneLink:
             except OSError:
                 pass
 
+    def send(self, data):
+        """Notify the phone on the TX characteristic. Quietly does nothing if it just went away."""
+        if self.conn is None:
+            return
+        try:
+            self.ble.gatts_notify(self.conn, self._tx, data)
+        except OSError:
+            pass
+
     def _irq(self, event, data):
         # Keep this short; the main loop does the robot work.
         if event == _IRQ_CONNECT:
@@ -157,8 +206,10 @@ _link = None  # created once, reused each time the mode is picked
 
 
 def _lights(alvik, rgb):
+    """Both LEDs to one colour. Returns it, so the caller knows what is showing."""
     alvik.left_led.set_color(*rgb)
     alvik.right_led.set_color(*rgb)
+    return rgb
 
 
 def run_remote(alvik):
@@ -180,31 +231,36 @@ def run_remote(alvik):
     stick = (0, 0)        # joystick from the web page: (x right, y forward), each -100..100
     stick_at = 0
     linear = angular = 0  # what the wheels are doing now (ramps towards what's asked for)
+    telemetry = False     # the web page asks for it; the Bluefruit app never does
+    told_at = 0
     last = ticks_ms()
 
-    _lights(alvik, (1, 1, 0))   # yellow: waiting for a phone
+    lit = _lights(alvik, (1, 1, 0))   # yellow: waiting for a phone (lit = the colour showing)
 
     while not alvik.get_touch_cancel():
         connected = _link.conn is not None
         if connected and not was_connected:
-            _lights(alvik, COLORS[color_i])
+            lit = _lights(alvik, COLORS[color_i])
         was_connected = connected
 
         if _link.lost:              # phone went away -> stop right away
             _link.lost = False
             held.clear()
             stick = (0, 0)
+            telemetry = False
             turbo = False              # the next phone starts fresh: turbo off, bumper on
             bumper = True              # (the web remote shows them that way when it connects)
             dance.stop()
             dancing = False
             alvik.brake()
-            _lights(alvik, (1, 1, 0))
+            lit = _lights(alvik, (1, 1, 0))
 
         while _link.events:
             event = _link.events.pop(0)
             button, pressed = event[0], event[1]
-            if button == "J":
+            if button == "T":
+                telemetry = pressed
+            elif button == "J":
                 stick = (event[1], event[2])
                 stick_at = ticks_ms()
                 if stick != (0, 0):
@@ -217,7 +273,7 @@ def run_remote(alvik):
                 dance.stop()               # arrows stop the dance (lights come back next tick)
             elif pressed and button == 1:
                 color_i = (color_i + 1) % len(COLORS)
-                _lights(alvik, COLORS[color_i])
+                lit = _lights(alvik, COLORS[color_i])
             elif pressed and button == 2:
                 turbo = not turbo
             elif pressed and button == 3:
@@ -225,9 +281,9 @@ def run_remote(alvik):
                 dancing = True
             elif pressed and button == 4:
                 bumper = not bumper
-                _lights(alvik, (0, 1, 0) if bumper else (1, 0, 0))   # quick green/red flash
+                lit = _lights(alvik, (0, 1, 0) if bumper else (1, 0, 0))   # quick green/red flash
                 sleep_ms(300)
-                _lights(alvik, COLORS[color_i])
+                lit = _lights(alvik, COLORS[color_i])
 
         now = ticks_ms()
         dt = min(ticks_diff(now, last), 200) / 1000
@@ -243,7 +299,7 @@ def run_remote(alvik):
         else:
             if dancing:                    # dance just ended -> back to normal lights
                 dancing = False
-                _lights(alvik, COLORS[color_i])
+                lit = _lights(alvik, COLORS[color_i])
             speed = TURBO_SPEED if turbo else SPEED
             want_linear = (speed if 5 in held else 0) - (speed if 6 in held else 0) \
                 + speed * stick[1] / 100
@@ -262,10 +318,17 @@ def run_remote(alvik):
                 linear = limit             # right away, no ramp
             now_blocked = limit == 0
         if now_blocked != blocked:
-            _lights(alvik, (1, 0, 0) if now_blocked else COLORS[color_i])
+            lit = _lights(alvik, (1, 0, 0) if now_blocked else COLORS[color_i])
             blocked = now_blocked
 
         alvik.drive(linear, angular)
+
+        if telemetry and connected and ticks_diff(now, told_at) >= TELEMETRY_MS:
+            told_at = now
+            left, right = dance.lights if move else (lit, lit)
+            _link.send(telemetry_packet(
+                alvik.get_pose()[2], front_distance(alvik.get_distance()), left, right,
+                linear, angular, turbo, bumper, blocked, bool(move)))
         sleep_ms(30)
 
     alvik.brake()

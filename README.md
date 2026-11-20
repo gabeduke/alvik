@@ -3,7 +3,8 @@
 The boys' Arduino Alvik: the stock demo menu plus a **phone remote** mode.
 
 ## Layout
-- `docs/` – the web remote (`index.html`) and the 🔧 flash page (`flash.html`, `flasher.js`)
+- `docs/` – the web remote (`index.html`), its live 3D robot (`twin.js`, `telemetry.js`, `models/alvik.glb`, `vendor/three/`) and the 🔧 flash page (`flash.html`, `flasher.js`)
+- `models/` – where the 3D robot comes from: reference files, credits and the Blender script that builds `docs/models/alvik.glb`
 - `scripts/build_site.sh` – builds the Pages site into `_site/`; `tests/` – flasher, build and robot-menu tests
 - `src/` – the robot's own code (the "core")
   - `main.py`, `demo.py` – the colour menu (stock modes, the purple phone remote, then installed sketches)
@@ -60,10 +61,13 @@ A joystick (push a little = slow, push a lot = fast) and big labelled buttons. T
 Works in Chrome/Edge (Android, laptop). iPad Safari can't do Bluetooth: open it in the free **Bluefy** app.
 The 🕹️ / 🙌 switch in the header changes how you drive, and the choice is remembered on that device: **One hand** (joystick) or **Two hands** (left thumb speed, right thumb steering: good on a tablet).
 Laptop keys: arrows or WASD drive, 1-4 for the buttons, Esc stops.
+
+**Live 3D robot.** The page shows a 3D Alvik that copies the real one: it turns when the robot turns, its wheels spin, its light strips take the LED colours (red when the bumper stops it), and a wall appears in front when the distance sensor sees something closer than 40 cm (yellow from 30 cm, red from 12 cm; drawn closer than it really is so it fits). It starts facing away from you; tap 🧭 when the real robot points away from you to line them up again. On a phone held upright in One hand mode it is a small picture in the corner: tap it to make it big, tap again to shrink it. The robot sends this about 5 times a second, only when the page asks (the Bluefruit app gets nothing new), so the robot needs the current `remote_control.py` (flash it with 🔧); with older robot code the remote still drives and the 3D robot stands still. The Turbo and Bumper labels follow what the robot reports. Packet layout: top of `docs/telemetry.js`. Heading comes from the wheels (`get_pose`), so it does not notice the robot being picked up and turned.
+The model is Arduino's Alvik chassis with the LEGO baseplate by GiulioT (CC BY-NC-SA); see `models/README.md`. three.js is copied into `docs/vendor/` (see `docs/vendor/README.md`); there is still no bundler or install step.
 ```sh
 scripts/build_site.sh && python3 -m http.server -d _site 8000   # then open http://localhost:8000
-node --test tests/*.test.mjs                                     # flasher + sketch build tests (Node 20+, no installs)
-python3 tests/test_robot.py                                      # menu + sketches on a pretend Alvik (no installs)
+node --test tests/*.test.mjs                                     # flasher, sketch build, telemetry and 3D model tests (Node 20+, no installs)
+python3 tests/test_robot.py                                      # menu, sketches, remote and telemetry on a pretend Alvik (no installs)
 ```
 `scripts/build_site.sh` builds `_site/` = `docs/` + `robot/*.py` (from `src/`) + `robot/index.json`
 (path, size, sha256 of each) + `sketches/<name>/` (each with its own `index.json`) + `sketches/index.json`

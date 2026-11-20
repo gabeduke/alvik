@@ -75,6 +75,7 @@ class FakeAlvik:
         self.drives = []
         self.stopped = False
         self.distance = lambda t: (None,) * 5
+        self.heading = lambda t: 0
         self.left_led = Led(self, "L")
         self.right_led = Led(self, "R")
 
@@ -92,6 +93,7 @@ class FakeAlvik:
     def get_touch_right(self): return self._touch("right")
     def get_distance(self): return self.distance(CLOCK.now)
     def get_line_sensors(self): return (0, 0, 0)
+    def get_pose(self): return (0, 0, self.heading(CLOCK.now))
 
     def drive(self, linear, angular):
         self.drives.append((CLOCK.now, linear, angular))
@@ -398,6 +400,7 @@ class TimedLink:
     def __init__(self, timeline):
         self.timeline = sorted(timeline, key=lambda e: e[0])
         self._events = []
+        self.sent = []                     # (ms, bytes) the robot notified
 
     @property
     def events(self):
@@ -409,17 +412,22 @@ class TimedLink:
                 self._events.append(event)
         return self._events
 
+    def send(self, data):
+        self.sent.append((CLOCK.now, bytes(data)))
+
     def start(self): pass
     def stop(self): pass
 
 
 class RemoteDriving(RobotTest):
-    def drive(self, timeline, until=4000, distance=None):
+    def drive(self, timeline, until=4000, distance=None, heading=None):
         import remote_control
         remote_control._link = TimedLink(timeline)
         robot = FakeAlvik()
         if distance:
             robot.distance = distance
+        if heading:
+            robot.heading = heading
         robot.presses = [(until, 10 ** 9, "cancel")]
         self.assertEqual(remote_control.run_remote(robot), -1)
         return robot, remote_control
@@ -495,6 +503,87 @@ class RemoteDriving(RobotTest):
     def test_bumper_does_not_stop_reversing(self):
         robot, rc = self.drive([(0, (6, True))], distance=lambda t: (5,) * 5)
         self.assertEqual(self.at(robot, 1000)[0], -rc.SPEED)
+
+
+def read_telemetry(pkt):
+    """The page's side of telemetry_packet (docs/telemetry.js), for checking what the robot sent."""
+    assert len(pkt) == 10 and pkt[:2] == b"!T" and (~sum(pkt[:9])) & 0xFF == pkt[9], pkt
+    s8 = lambda b: b - 256 if b > 127 else b
+    h = pkt[2] | pkt[3] << 8
+    bits = lambda v: tuple((v >> i) & 1 for i in range(3))
+    return {"heading": (h - 65536 if h > 32767 else h) / 10, "distance": None if pkt[4] == 255 else pkt[4],
+            "left": bits(pkt[5]), "right": bits(pkt[5] >> 3), "speed": s8(pkt[6]) / 5, "turn": s8(pkt[7]) * 3,
+            "turbo": bool(pkt[8] & 1), "bumper": bool(pkt[8] & 2), "blocked": bool(pkt[8] & 4),
+            "dancing": bool(pkt[8] & 8)}
+
+
+class Telemetry(RobotTest):
+    ASK = (0, ("T", True))
+    drive = RemoteDriving.drive
+
+    def told(self, rc, t):
+        """What the robot last said at or before time t."""
+        return read_telemetry([p for when, p in rc._link.sent if when <= t][-1])
+
+    def test_packets_match_the_shared_examples(self):
+        import remote_control as rc
+        with open(os.path.join(REPO, "tests", "telemetry_vectors.json")) as f:
+            for case in json.load(f):
+                self.assertEqual(rc.telemetry_packet(**case["robot"]).hex(), case["hex"], case["note"])
+
+    def test_request_packet_is_parsed(self):
+        import remote_control as rc
+        ev = []
+        on, off = bytes((0x21, 84, 49, 0)), bytes((0x21, 84, 48, 0))
+        data = on + bytes(((~sum(on)) & 0xFF,)) + off + bytes(((~sum(off)) & 0xFF,))
+        self.assertEqual(rc.parse_packets(data, ev), b"")
+        self.assertEqual(ev, [("T", True), ("T", False)])
+
+    def test_nothing_is_sent_unless_the_page_asks(self):
+        robot, rc = self.drive([(0, (5, True))])
+        self.assertEqual(rc._link.sent, [])
+
+    def test_about_five_a_second_with_heading_distance_and_speed(self):
+        robot, rc = self.drive([self.ASK, (0, ("J", 0, 100))] + [(t, ("J", 0, 100)) for t in range(150, 3000, 150)],
+                               until=3000, heading=lambda t: 400 if t > 2000 else 12.34,
+                               distance=lambda t: (3, None, 61.6, 80, 3))
+        times = [when for when, p in rc._link.sent]
+        self.assertTrue(13 <= len(times) <= 16, len(times))
+        self.assertTrue(all(b - a >= rc.TELEMETRY_MS for a, b in zip(times, times[1:])))
+        t = self.told(rc, 1500)
+        self.assertEqual((t["heading"], t["distance"], t["speed"], t["turn"]), (12.3, 62, rc.SPEED, 0))
+        self.assertEqual((t["left"], t["right"]), (WHITE, WHITE))
+        self.assertEqual((t["turbo"], t["bumper"], t["blocked"], t["dancing"]), (False, True, False, False))
+        self.assertEqual(self.told(rc, 2900)["heading"], 40, "heading wraps to -180..180")
+
+    def test_toggles_blocked_and_lights_are_reported(self):
+        def distance(t):
+            d = 100 if t < 2000 else 5
+            return (None, d, d, d, None)
+        robot, rc = self.drive([self.ASK, (100, (2, True)), (200, (1, True)), (300, (5, True)), (3000, (4, True))],
+                               until=3900, distance=distance)
+        t = self.told(rc, 1900)
+        self.assertEqual((t["turbo"], t["bumper"], t["blocked"], t["speed"]), (True, True, False, rc.TURBO_SPEED))
+        self.assertEqual(t["left"], RED, "button 1: white -> red")
+        t = self.told(rc, 2900)
+        self.assertEqual((t["blocked"], t["speed"], t["distance"]), (True, 0, 5))
+        t = self.told(rc, 3800)
+        self.assertEqual((t["bumper"], t["blocked"], t["speed"]), (False, False, rc.TURBO_SPEED))
+
+    def test_dance_reports_both_colours_and_the_spin(self):
+        robot, rc = self.drive([self.ASK, (500, (3, True))], until=6000)
+        t = self.told(rc, 1000)
+        self.assertTrue(t["dancing"])
+        self.assertNotEqual(t["left"], t["right"])
+        self.assertEqual(robot.colour_at(1000), (t["left"], t["right"]), "says what the LEDs really show")
+        self.assertEqual(self.told(rc, 4300)["turn"], 360)
+        t = self.told(rc, 5500)
+        self.assertEqual((t["dancing"], t["left"], t["turn"]), (False, WHITE, 0))
+
+    def test_a_new_phone_has_to_ask_again(self):
+        robot, rc = self.drive([self.ASK, (1000, "lost")], until=3000)
+        self.assertTrue(rc._link.sent)
+        self.assertLessEqual(max(when for when, p in rc._link.sent), 1000)
 
 
 if __name__ == "__main__":

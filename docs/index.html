@@ -11,6 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Alvik">
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <style>
   :root {
     --bg: #1b1630; --panel: #2a2347; --text: #fff; --muted: #b8b0d8;
@@ -26,7 +27,7 @@
     user-select: none; -webkit-user-select: none; touch-action: none;
     overflow: hidden;
   }
-  header { width: 100%; max-width: 900px; display: flex; align-items: center; gap: 12px; }
+  header { width: 100%; max-width: 1000px; display: flex; align-items: center; gap: 12px; }
   h1 { margin: 0; font-size: 28px; flex: 1; }
   #status { font-size: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
   @media (max-width: 560px) { #statusText, #toolsText, #layout span, #title { display: none; } #layout button { font-size: 18px; padding: 5px 8px; } h1 { font-size: 24px; white-space: nowrap; } #tools { font-size: 18px; padding: 8px 10px; } #connect { font-size: 18px; padding: 11px 14px; } }
@@ -40,7 +41,7 @@
   #msg { max-width: 600px; text-align: center; color: var(--muted); font-size: 18px; line-height: 1.4; }
   #msg:empty { display: none; }
   main {
-    flex: 1; width: 100%; max-width: 900px;
+    flex: 1; width: 100%; max-width: 1000px;
     display: flex; align-items: center; justify-content: space-around; gap: 24px; flex-wrap: wrap;
   }
   .stick {
@@ -124,6 +125,63 @@
     body[data-layout="two"] button.big.action { height: min(15vw, 28vh, 150px); font-size: min(2.2vw, 20px); }
     body[data-layout="two"] .action .emoji { font-size: min(6vw, 12vh, 52px); }
   }
+  /* The 3D robot. It must never crowd the controls, so where it goes depends on the room there is:
+     one hand, tall screen: a small picture in the corner above the joystick (tap = big, tap = small)
+     one hand, wide screen: a panel between the joystick and the buttons
+     two hands: in the gap above the steering slider (tall) or above the buttons (wide, if tall enough) */
+  main { position: relative; }
+  #twin {
+    position: absolute; top: -10px; right: -6px; width: clamp(72px, 21vw, 92px); height: clamp(72px, 21vw, 92px); z-index: 2;
+    border-radius: 18px; overflow: hidden; background: var(--bg); cursor: pointer;
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.08), 0 4px 0 rgba(0,0,0,.35);
+  }
+  #twin[hidden] { display: none; }
+  #twin canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }   /* never sets the card's size */
+  #twin::after {            /* the frame, drawn over the picture */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.1);
+  }
+  #twin.big { left: -6px; width: auto; height: min(44vh, 100vw); }
+  #twinCredit {             /* who made the model: the licence asks for it */
+    position: absolute; left: 8px; top: 7px; font-size: 10px; color: var(--muted); opacity: .75; white-space: nowrap;
+    max-width: calc(100% - 52px); overflow: hidden; text-overflow: ellipsis;
+  }
+  #twinCredit a { color: inherit; }
+  #twinInfo {
+    position: absolute; left: 8px; bottom: 6px; font-size: 13px; font-weight: 700; color: var(--muted);
+    pointer-events: none; text-shadow: 0 1px 2px #000; white-space: nowrap;
+  }
+  #twinInfo.slow { color: var(--lights); } #twinInfo.stop { color: #ff6b6b; }
+  #twinNorth {
+    position: absolute; right: 6px; top: 6px; font: inherit; font-size: 18px; line-height: 1; padding: 6px;
+    border: 0; border-radius: 10px; background: rgba(42,35,71,.8); cursor: pointer;
+  }
+  #twin:not(.big) #twinNorth, #twin:not(.big) #twinInfo, #twin:not(.big) #twinCredit { display: none; }
+  @media (min-aspect-ratio: 1/1) {
+    body[data-layout="stick"] #twin {
+      position: relative; flex: 1 1 0; min-width: 130px; max-width: 340px; width: auto;
+      height: min(56vh, 340px); cursor: default;
+    }
+    body[data-layout="stick"] #twin #twinNorth, body[data-layout="stick"] #twin #twinInfo,
+    body[data-layout="stick"] #twin #twinCredit { display: block; }
+  }
+  body[data-layout="two"] #twin {
+    position: relative; grid-area: w; width: 100%; height: auto; align-self: stretch; min-height: 0;
+    max-width: 340px; cursor: default;
+  }
+  body[data-layout="two"] #twin #twinNorth, body[data-layout="two"] #twin #twinInfo,
+  body[data-layout="two"] #twin #twinCredit { display: block; }
+  body[data-layout="two"] main {
+    grid-template-areas: "a a" "t w" "t s"; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 12px; min-height: 0;
+  }
+  @media (min-aspect-ratio: 1/1) {
+    body[data-layout="two"] main { grid-template-areas: "t w s" "t a s"; grid-template-rows: minmax(0, 1fr) auto; }
+    body[data-layout="two"] #twin { max-width: none; }
+  }
+  @media (min-aspect-ratio: 1/1) and (max-height: 620px) {
+    body[data-layout="two"] main { grid-template-areas: "t a s"; grid-template-rows: auto; }
+    body[data-layout="two"] #twin { display: none; }
+  }
   /* one hand / two hands switch: both shown, the one in use is lit */
   #layout { display: flex; background: var(--panel); border-radius: 12px; padding: 3px; gap: 2px; }
   #layout button {
@@ -164,6 +222,14 @@
     <span class="mark w">◀</span><span class="mark e">▶</span><div class="knob">↔️</div>
   </div>
 
+  <div id="twin" hidden title="This is your robot, live">
+    <canvas aria-label="A 3D picture of the robot. It turns, drives and lights up like the real one."></canvas>
+    <span id="twinInfo"></span>
+    <span id="twinCredit">3D: <a href="https://docs.arduino.cc/hardware/alvik/" target="_blank" rel="noopener">Arduino</a> +
+      <a href="https://makerworld.com/en/models/1298936" target="_blank" rel="noopener">GiulioT</a> · CC BY-NC-SA</span>
+    <button id="twinNorth" title="Tap when the robot is pointing away from you">🧭</button>
+  </div>
+
   <div class="actions">
     <button class="big action" data-b="1"><span class="emoji">💡</span>Lights<span class="state"></span></button>
     <button class="big action" data-b="2"><span class="emoji">🚀</span>Turbo<span class="state" id="turboState">off</span></button>
@@ -176,6 +242,7 @@
 
 <script type="module">
 import { initPwa } from "./pwa.js";
+import { NUS_TX, telemetryRequest, telemetryReader } from "./telemetry.js";
 
 // Talks to remote_control.py on the robot over the Nordic UART service.
 // Buttons are the "Control Pad" packets the Bluefruit Connect app sends:
@@ -184,6 +251,8 @@ import { initPwa } from "./pwa.js";
 //   '!' 'J' <x> <y> <checksum>     signed bytes -100..100, x right, y forward
 // Checksum = ~(sum of the first 4 bytes) & 0xff. The robot stops if joystick packets stop coming
 // for 0.6 s, so while the stick is held we repeat it.
+// The robot talks back too (telemetry.js): heading, distance, lights, speed, turbo and bumper, five
+// times a second once we ask. That drives the 3D robot (twin.js) and the Turbo / Bumper labels.
 const NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const RX  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";   // robot listens here
 
@@ -194,6 +263,9 @@ let queue = Promise.resolve();          // BLE writes must not overlap
 let turbo = false, bumper = true;       // robot starts each session with turbo off, bumper on
 const held = new Map();                 // pointerId / key -> button number
 let pwa = null;                         // set up at the bottom
+let twin = null;                        // the 3D robot, once it has loaded (the remote works without it)
+let heard = false;                      // has this robot sent telemetry? (one with old code never does)
+let toggledAt = 0;                      // when Turbo or Bumper was last pressed here
 
 function packet(kind, a, b) {
   const bytes = [0x21, kind.charCodeAt(0), a & 0xff, b & 0xff];
@@ -330,6 +402,9 @@ function setConnected(on) {
   allButtons.forEach((b) => (b.disabled = !on));
   controls.forEach((c) => c.classList.toggle("disabled", !on));
   sent = [0, 0]; stickBusy = false;      // a robot we just met is standing still
+  heard = false;
+  twin?.reset();
+  showDistance(null);
   if (on) {
     turbo = false; bumper = true; showToggles();
   } else {
@@ -346,6 +421,44 @@ function showToggles() {
   document.querySelector('[data-b="4"]').classList.toggle("off", !bumper);
 }
 
+// ---------- what the robot says back ----------
+function showDistance(t) {
+  const info = $("twinInfo"), cm = t?.distance ?? null;
+  info.textContent = cm === null || cm > 99 ? "" : `🧱 ${cm} cm`;
+  info.className = t?.blocked || (cm !== null && cm < 12) ? "stop" : cm !== null && cm < 30 ? "slow" : "";
+}
+
+function onTelemetry(t) {
+  if (!heard) $("msg").textContent = "";
+  heard = true;
+  // The robot knows best, so the labels can't drift. Just after a press we wait a moment: the
+  // packet in the air may be from before the robot heard it.
+  if ((t.turbo !== turbo || t.bumper !== bumper) && performance.now() - toggledAt > 500) {
+    turbo = t.turbo; bumper = t.bumper; showToggles();
+  }
+  twin?.update(t);
+  showDistance(t);
+}
+
+// Old robot code has the TX characteristic but never sends anything: then the 3D robot just stands still.
+async function listen(service) {
+  try {
+    const tx = await service.getCharacteristic(NUS_TX);
+    const feed = telemetryReader(onTelemetry);
+    tx.addEventListener("characteristicvaluechanged", (e) => {
+      const v = e.target.value;
+      feed(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+    });
+    await tx.startNotifications();
+    await write(telemetryRequest(true));
+    setTimeout(() => {
+      if (rx && !heard) $("msg").textContent = "The 3D robot needs new robot code. Tap 🔧 to update the robot.";
+    }, 3000);
+  } catch (e) {
+    console.warn("no telemetry", e);
+  }
+}
+
 async function connect() {
   if (device?.gatt?.connected) { device.gatt.disconnect(); return; }
   try {
@@ -360,6 +473,7 @@ async function connect() {
     const service = await server.getPrimaryService(NUS);
     rx = await service.getCharacteristic(RX);
     setConnected(true);
+    listen(service);
   } catch (e) {
     if (e.name !== "NotFoundError") {   // NotFoundError = user closed the picker
       $("msg").textContent = "Couldn't connect: " + e.message +
@@ -374,8 +488,8 @@ function press(id, el) {
   held.set(id, b);
   el.classList.add("down");
   send(b, true);
-  if (b === 2) { turbo = !turbo; showToggles(); }
-  if (b === 4) { bumper = !bumper; showToggles(); }
+  if (b === 2) { turbo = !turbo; showToggles(); toggledAt = performance.now(); }
+  if (b === 4) { bumper = !bumper; showToggles(); toggledAt = performance.now(); }
   if (b === 3) { el.classList.add("dancing"); setTimeout(() => el.classList.remove("dancing"), 4000); }
 }
 
@@ -442,6 +556,19 @@ if (!navigator.bluetooth) {
     ? "This browser can't talk to Bluetooth robots. On iPad, open this page in the free <b>Bluefy</b> app instead."
     : "This browser can't talk to Bluetooth robots. Try <b>Chrome</b> or <b>Edge</b>.";
 }
+
+// The 3D robot loads after everything else, and the remote is fine without it (old phone, no WebGL).
+const twinEl = $("twin");
+import("./twin.js")
+  .then(({ createTwin }) => { twinEl.hidden = false; return createTwin(twinEl.querySelector("canvas")); })
+  .then((t) => { twin = t; })
+  .catch((e) => { twinEl.hidden = true; console.warn("no 3D robot", e); });
+twinEl.addEventListener("click", (e) => {
+  if (e.target.id === "twinNorth") { twin?.recentre(); return; }
+  if (e.target.closest("a")) return;
+  // small picture in the corner (one hand, tall screen): tap to make it big, tap again to shrink
+  if (getComputedStyle(twinEl).position === "absolute") twinEl.classList.toggle("big");
+});
 
 // Installable app + self-updating (pwa.js). Never reload while connected: that drops Bluetooth
 // and the robot brakes, so the reload waits until it disconnects.
