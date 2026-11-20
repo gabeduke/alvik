@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🙀 Teach it a trick · Alvik lessons</title>
+<meta name="description" content="Lesson 8: Write a small program of your own and put it in the robot's menu.">
+<meta property="og:title" content="🙀 Teach it a trick · Alvik lessons">
+<meta property="og:description" content="Lesson 8: Write a small program of your own and put it in the robot's menu.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 8 of 9 · about 30 minutes</p>
+<h1>🙀 Teach it a trick</h1>
+<p class="lead">Time to write a program of your own. A <b>sketch</b> is a small program that shows up
+  as a new colour in the robot's menu. You will read one, then write one: a <b>scaredy cat</b> that
+  backs away when something comes close.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>The robot, a USB-C cable and the computer from lesson 1.</li>
+    <li>Something to type code in. <b>Arduino Lab for MicroPython</b> is enough.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>▶️ Read one first</h2>
+  <ol class="steps">
+    <li>On the <a href="../flash.html">🔧 Update the robot</a> page, add <b>🐕 Follow me</b> and update the robot.</li>
+    <li>On the robot, tap <kbd>⬆</kbd> until the lights are <b>yellow</b>, then <kbd>✓</kbd>. Hold your hand in front of it and walk it around like a puppy.</li>
+    <li>Now read it. The whole program is one function:</li>
+  </ol>
+  <pre><code>def run(alvik):
+    readings = alvik.get_distance()                  <span class="c"># cm, or None if a sensor has no reading yet</span>
+    readings = [SEE_CM + 1 if d is None else d for d in readings]
+    closest = min(readings)
+    where = readings.index(closest)                  <span class="c"># 0 = far left ... 2 = middle ... 4 = far right</span>
+
+    if closest &gt; SEE_CM:
+        lights(alvik, WAITING)
+        alvik.brake()
+    else:
+        lights(alvik, FOLLOWING)
+        speed = max(-MAX_SPEED, min(MAX_SPEED, closest - NEAR_CM))   <span class="c"># too far: forward, too close: back up</span>
+        turn = (2 - where) * TURN                                    <span class="c"># positive = turn left</span>
+        alvik.drive(speed, turn)
+
+    sleep_ms(50)
+    return 1</code></pre>
+  <p>Find the closest of the five readings. If it is on the left, turn left. If it is further than
+    the puppy likes, drive forward; if it is nearer, back up. That is all a puppy needs.</p>
+  <p><code>alvik.drive(speed, turn)</code> is the one command for moving: a speed in cm/s (negative
+    is backwards) and a turn in degrees per second (positive is left).</p>
+</section>
+
+<section>
+  <h2>🔍 How a sketch works</h2>
+  <p>A sketch is a folder with three files in it:</p>
+  <div class="scroll"><table>
+    <tr><th>File</th><th>What it is</th></tr>
+    <tr><td><code>scaredy_cat.py</code></td><td>The program. It must have a function called <code>run(alvik)</code>.</td></tr>
+    <tr><td><code>sketch.json</code></td><td>A label: its name, an emoji, a line about it, and the colour of its menu light.</td></tr>
+    <tr><td><code>README.md</code></td><td>A note for people: what it does, its lights and buttons.</td></tr>
+  </table></div>
+  <p>The menu calls <code>run(alvik)</code> <b>again and again</b>, many times a second, until
+    someone presses ✗. So <code>run</code> does one small step each time: look, decide, move, done.
+    Don't write a loop that goes on for ever inside it, or ✗ will stop working.</p>
+  <p>When the robot starts, it looks in its <code>/sketches</code> folder, reads each
+    <code>sketch.json</code>, and adds a colour to the menu for each one. If your program crashes,
+    the lights flash red three times and the menu comes back. Nothing breaks.</p>
+</section>
+
+<section>
+  <h2>✍️ Write the scaredy cat</h2>
+  <p>Make a folder called <code>scaredy_cat</code> and type these two files into it. Typing it
+    yourself is slower than copying, and you will understand it better.</p>
+  <p><b><code>scaredy_cat.py</code></b></p>
+  <pre><code>from time import sleep_ms
+
+TOO_CLOSE_CM = 15    <span class="c"># closer than this is scary</span>
+BACK_SPEED = 8       <span class="c"># cm/s</span>
+
+CALM = (0, 1, 0)
+SCARED = (1, 0, 0)
+
+
+def lights(alvik, rgb):
+    alvik.left_led.set_color(*rgb)
+    alvik.right_led.set_color(*rgb)
+
+
+def run(alvik):
+    middle = alvik.get_distance()[2]          <span class="c"># cm to whatever is straight ahead, or None for nothing</span>
+    if middle is not None and middle &lt; TOO_CLOSE_CM:
+        lights(alvik, SCARED)
+        alvik.drive(-BACK_SPEED, 0)           <span class="c"># backwards, without turning</span>
+    else:
+        lights(alvik, CALM)
+        alvik.brake()
+    sleep_ms(50)</code></pre>
+  <p><b><code>sketch.json</code></b></p>
+  <pre><code>{
+  "title": "Scaredy cat",
+  "emoji": "🙀",
+  "description": "Sits still until something comes close, then backs away from it.",
+  "color": [0, 1, 1],
+  "hardware": ["distance sensors", "wheels", "lights"],
+  "entry": "scaredy_cat"
+}</code></pre>
+  <p><code>"color": [0, 1, 1]</code> is green and blue together: cyan. <code>"entry"</code> is the
+    name of your <code>.py</code> file, without the <code>.py</code>.</p>
+
+  <h3>Put it on the robot</h3>
+  <p>The folder has to end up on the robot as <code>/sketches/scaredy_cat/</code>. Three ways, easiest first:</p>
+  <ul>
+    <li><b>Just to see it:</b> the finished one is already in the extras on the
+      <a href="../flash.html">update page</a> as 🙀 Scaredy cat.</li>
+    <li><b>Arduino Lab for MicroPython:</b> connect, open the robot's files, make a folder
+      <code>scaredy_cat</code> inside <code>sketches</code> (make <code>sketches</code> too if it
+      isn't there), and save your two files into it. Switch the robot off and on.</li>
+    <li><b>A terminal</b>, with <a href="https://docs.micropython.org/en/latest/reference/mpremote.html">mpremote</a> installed:
+      <pre><code>mpremote fs mkdir :sketches
+mpremote fs cp -r scaredy_cat :sketches/ + reset</code></pre>
+      (The first line complains if the folder is already there. That is fine.)</li>
+  </ul>
+  <p>Then on the robot: <kbd>⬆</kbd> until the lights are <b>cyan</b>, and <kbd>✓</kbd>. Green means calm. Bring your hand to its nose.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>Break it on purpose.</b> Change <code>TOO_CLOSE_CM</code> to 20 and put the robot on an empty floor. What does it do, and why? (Lesson 5 has the answer.)</li>
+    <li><b>Turn tail.</b> Make it spin away instead of backing up: <code>alvik.drive(0, 90)</code>.</li>
+    <li><b>Look both ways.</b> <code>alvik.get_distance()</code> gives five numbers. Use the left and right ones to turn away from the side the scary thing is on.</li>
+    <li><b>A brave cat.</b> Make one that creeps towards things instead, and stops just in time.</li>
+    <li><b>Crash it.</b> Spell <code>brake</code> wrong and run it. Count the red flashes. The robot also prints which line went wrong down the USB cable: the <a href="https://github.com/gabeduke/alvik#menu-colors">README</a> says how to read it.</li>
+  </ul>
+</section>
+
+<section class="change">
+  <h2>✏️ Make your own</h2>
+  <p>Now invent one. A robot that turns to face the brightest colour? One that draws a square, or
+    refuses to cross a black line? The Alvik commands used in this project are a good start:
+    <code>drive</code>, <code>brake</code>, <code>get_distance</code>, <code>get_line_sensors</code>,
+    <code>get_color</code>, <code>left_led.set_color</code>, and <code>get_touch_ok</code> for the ✓ button.
+    The full list is in <a href="https://docs.arduino.cc/tutorials/alvik/api-overview/">Arduino's Alvik guide</a>.</p>
+  <p>The rules for a sketch that other people can install from the update page are in the
+    <a href="https://github.com/gabeduke/alvik#sketches">README</a>.</p>
+</section>
+
+<nav class="next">
+  <a href="7-underneath.html"><small>← Lesson 7</small>🌈 Underneath</a>
+  <a class="fwd" href="9-yours.html"><small>Lesson 9 →</small>🛠️ Make it yours</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

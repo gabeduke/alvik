@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🚀 Smooth moves · Alvik lessons</title>
+<meta name="description" content="Lesson 3: Why the robot speeds up gently, and what stops it if the remote goes quiet.">
+<meta property="og:title" content="🚀 Smooth moves · Alvik lessons">
+<meta property="og:description" content="Lesson 3: Why the robot speeds up gently, and what stops it if the remote goes quiet.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 3 of 9 · about 20 minutes</p>
+<h1>🚀 Smooth moves</h1>
+<p class="lead">A robot that jumps to full speed tips, skids and is hard to steer. This one <b>ramps</b>:
+  it speeds up gently and slows down a bit quicker. It also stops by itself if the remote goes quiet.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul><li>The robot and remote from <a href="2-drive.html">lesson 2</a>, or the pretend robot.</li></ul>
+  <a class="go real" href="../?show=">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=">🎮 Pretend robot</a>
+</section>
+
+<section>
+  <h2>▶️ Do it</h2>
+  <ol class="steps">
+    <li>Connect, then push the joystick all the way forward in one go. The robot takes about a quarter of a second to reach its speed of 8 cm/s (the <b>💨</b> number under the 3D robot). That is short, but it is not a jump: watch how it doesn't jerk.</li>
+    <li>Let go. It stops faster than it started.</li>
+    <li>Push forward, then pull straight back. It slows to zero first and only then goes backwards.</li>
+    <li>Press <b>🚀 Turbo</b> and do it again. The top speed is now 13 cm/s, about as fast as an Alvik goes.</li>
+    <li>Now push the stick just a little. Nothing happens in the very middle: that is the <b>dead zone</b>, so a resting thumb doesn't creep the robot along.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>🔍 How it works</h2>
+  <p>Roughly thirty times a second the robot goes round a loop: read what was asked for, work out a
+    speed, tell the wheels. The joystick says what speed you <i>want</i>. The robot keeps its own
+    number for the speed it is doing <i>now</i>, and each time round the loop it moves that number a
+    small step towards what you want.</p>
+  <pre><code>ACCEL = 30           <span class="c"># cm/s per second: how gently it speeds up</span>
+DECEL = 60           <span class="c"># cm/s per second: how quickly it slows down</span>
+
+linear = ramp(linear, want_linear, ACCEL * dt, DECEL * dt)</code></pre>
+  <p><code>dt</code> is how long the last trip round the loop took, in seconds. So one step is
+    "30 cm/s per second, times a thirtieth of a second": about 1 cm/s. About eight steps to reach full speed.</p>
+
+  <h3>Draw the ramp</h3>
+  <div class="play">
+    <label>Speeding up <input type="range" id="acc" min="3" max="120" value="30"><output id="accv"></output></label>
+    <label>Slowing down <input type="range" id="dec" min="3" max="120" value="60"><output id="decv"></output></label>
+    <canvas id="graph" aria-label="A graph of speed against time: the stick is pushed forward for a second and a half, then pulled back."></canvas>
+    <p class="verdict muted small">Dotted line: what the joystick asks for (forward for a second and a half, then
+      straight into reverse). Solid line: what the robot does.</p>
+  </div>
+
+  <h3>If the remote goes quiet</h3>
+  <p>What if the phone's battery dies while the robot is driving at the stairs? While you hold the
+    joystick, the page sends its packet again about five times a second, even if you haven't moved. The
+    robot expects that. If it hears nothing for 600 milliseconds, it stops:</p>
+  <pre><code>if stick != (0, 0) and ticks_diff(now, stick_at) &gt; STICK_TIMEOUT_MS:
+    stick = (0, 0)                 <span class="c"># the page stopped talking: don't keep driving</span></code></pre>
+  <p>Engineers call this a <b>dead man's switch</b>. Trains have one too. The page helps as well: if
+    you switch to another app or the screen locks, it lets go of the joystick for you.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>Time it.</b> From the numbers above: how long does it take to get from 0 to 8 cm/s? And from 8 back to 0? Check with the graph.</li>
+    <li><b>Make a truck.</b> In the graph, slide "speeding up" down to 5. How would that robot feel to drive? What about "slowing down" at 5 near the edge of a table?</li>
+    <li><b>Test the switch.</b> Drive the real robot forward and walk away with the phone until it stops. Two things can stop it: Bluetooth noticing that the phone has gone, or 600 milliseconds going by with no packet. Why is it good to have both?</li>
+    <li><b>Find the dead zone.</b> In two-hands mode, push the speed slider up very slowly. How far does it go before the robot moves?</li>
+  </ul>
+</section>
+
+<section class="change">
+  <h2>✏️ Change it</h2>
+  <p>The numbers that set how the robot drives are at the top of
+    <a href="https://github.com/gabeduke/alvik/blob/main/src/remote_control.py"><code>remote_control.py</code></a>:
+    <code>SPEED</code>, <code>TURBO_SPEED</code>, <code>TURN</code>, <code>ACCEL</code>, <code>DECEL</code>.
+    To change one on your robot:</p>
+  <ol>
+    <li>Plug the robot in and open <b>Arduino Lab for MicroPython</b>. Connect, and open the robot's files.</li>
+    <li>Open <code>remote_control.py</code> from the robot, change <code>ACCEL = 30</code> to <code>ACCEL = 8</code>, and save it back to the robot.</li>
+    <li>Switch the robot off and on, go to purple, and drive.</li>
+  </ol>
+  <p class="muted small">The update page from lesson 1 puts the original numbers back. To keep your
+    changes for good, make your own copy of the project: <a href="9-yours.html">lesson 9</a>.</p>
+</section>
+
+<script type="module">
+import { ramp } from "../bumper.js";             // the robot's own ramp, in JavaScript
+const $ = (id) => document.getElementById(id);
+const canvas = $("graph"), pen = canvas.getContext("2d");
+const SECONDS = 4, TOP = 8, DT = 0.03;
+const want = (t) => (t < 0.3 ? 0 : t < 1.8 ? TOP : t < 3.3 ? -TOP : 0);
+
+function draw() {
+  const acc = Number($("acc").value), dec = Number($("dec").value);
+  $("accv").textContent = acc; $("decv").textContent = dec;
+  const ratio = Math.min(devicePixelRatio || 1, 2), w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * ratio; canvas.height = h * ratio;
+  pen.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const x = (t) => 8 + t / SECONDS * (w - 16), y = (v) => h / 2 - v / (TOP * 1.25) * (h / 2);
+  pen.clearRect(0, 0, w, h);
+  pen.strokeStyle = "rgba(255,255,255,.18)"; pen.lineWidth = 1; pen.setLineDash([]);
+  pen.beginPath(); pen.moveTo(x(0), y(0)); pen.lineTo(x(SECONDS), y(0)); pen.stroke();
+  pen.fillStyle = "#b8b0d8"; pen.font = "12px system-ui";
+  pen.fillText("forward 8 cm/s", 10, y(TOP) - 4); pen.fillText("backward", 10, y(-TOP) + 14);
+  for (let s = 1; s < SECONDS; s++) pen.fillText(s + " s", x(s) - 8, y(0) + 14);
+  pen.strokeStyle = "#b8b0d8"; pen.setLineDash([4, 4]);
+  pen.beginPath();
+  for (let t = 0; t <= SECONDS; t += DT) pen.lineTo(x(t), y(want(t)));
+  pen.stroke();
+  pen.strokeStyle = "#3fa9f5"; pen.lineWidth = 3; pen.setLineDash([]);
+  pen.beginPath();
+  let v = 0;
+  for (let t = 0; t <= SECONDS; t += DT) { v = ramp(v, want(t), acc * DT, dec * DT); pen.lineTo(x(t), y(v)); }
+  pen.stroke();
+}
+$("acc").addEventListener("input", draw);
+$("dec").addEventListener("input", draw);
+addEventListener("resize", draw);
+draw();
+</script>
+
+<nav class="next">
+  <a href="2-drive.html"><small>← Lesson 2</small>🕹️ Drive it</a>
+  <a class="fwd" href="4-talks-back.html"><small>Lesson 4 →</small>📡 The robot talks back</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

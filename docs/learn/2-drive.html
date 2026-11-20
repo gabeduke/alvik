@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🕹️ Drive it · Alvik lessons</title>
+<meta name="description" content="Lesson 2: Connect over Bluetooth and drive. Every push of the joystick is five bytes.">
+<meta property="og:title" content="🕹️ Drive it · Alvik lessons">
+<meta property="og:description" content="Lesson 2: Connect over Bluetooth and drive. Every push of the joystick is five bytes.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 2 of 9 · about 20 minutes</p>
+<h1>🕹️ Drive it</h1>
+<p class="lead">Connect a phone or laptop to the robot over Bluetooth and drive it around. Then look
+  at what the page really sends: <b>five bytes</b> at a time.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>The robot from <a href="1-wake-up.html">lesson 1</a>, on the floor with some room.</li>
+    <li>A phone, tablet or laptop with <b>Chrome</b> or <b>Edge</b>. On an iPad or iPhone, the free <b>Bluefy</b> browser. (Safari and Firefox can't do Bluetooth from a web page.)</li>
+  </ul>
+  <a class="go real" href="../?show=">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=">🎮 No robot: use the pretend one</a>
+  <p class="muted small">These links open the remote with the sensors switched off, so there is less to
+    look at. You will see a 3D robot copying yours: how it knows what to do is lesson 4.</p>
+</section>
+
+<section>
+  <h2>▶️ Do it</h2>
+  <ol class="steps">
+    <li>On the robot, tap <kbd>⬆</kbd> until the lights are <b>purple</b>, then tap <kbd>✓</kbd>. The lights go <b>yellow</b>: it is waiting for you.</li>
+    <li>On the remote, press <b>Connect</b> and pick <b>Alvik</b>. The robot's lights go white.</li>
+    <li>Drag the joystick. Push a little to go slowly and a lot to go fast.</li>
+    <li>Try the four buttons: <b>💡 Lights</b> changes the colour, <b>🚀 Turbo</b> is faster, <b>🪩 Disco</b> dances, and <b>🛡️ Bumper</b> is lesson 6.</li>
+    <li>On a laptop you can use the arrow keys or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, and <kbd>1</kbd> to <kbd>4</kbd> for the buttons.</li>
+    <li>To stop, press <kbd>✗</kbd> on the robot. It goes back to the menu.</li>
+  </ol>
+  <p class="note"><b>Only one remote at a time.</b> While someone is connected the robot stops
+    calling out, so nobody else can find it. Yellow lights mean it is calling out again.</p>
+</section>
+
+<section>
+  <h2>🔍 How it works</h2>
+  <p>The robot and the page talk over <b>Bluetooth Low Energy</b>. The robot calls out "I'm Alvik",
+    the page answers, and from then on the page can write short messages to it. Nothing travels
+    over the internet: you can switch the wifi off and it still works.</p>
+  <p>Every message is a <b>packet</b> of five bytes. A byte is a number from 0 to 255.</p>
+  <div class="bytes">
+    <span>!<small>start</small></span><span>B<small>button</small></span><span>3<small>which one</small></span><span>1<small>1 down, 0 up</small></span><span class="sum">8<small>checksum</small></span>
+  </div>
+  <div class="bytes">
+    <span>!<small>start</small></span><span>J<small>joystick</small></span><span>x<small>-100 to 100</small></span><span>y<small>-100 to 100</small></span><span class="sum">?<small>checksum</small></span>
+  </div>
+  <p class="muted small">Shown as letters here. Each letter is really a number: <code>!</code> is 33, <code>B</code> is 66, <code>1</code> is 49.</p>
+  <p>A button packet says which button, and whether it went down or came back up. A joystick packet
+    says where the stick is: <code>x</code> is left and right, <code>y</code> is back and forward.</p>
+  <p>The last byte is a <b>checksum</b>. The page adds up the first four bytes, flips every bit, and
+    sends what is left. The robot does the same sum on what arrived. If its answer is different,
+    the radio garbled something, and it throws the packet away instead of driving off on a wrong number.</p>
+
+  <h3>Make a packet</h3>
+  <div class="play" id="maker">
+    <div class="row">
+      <button data-b="1">💡 Lights</button><button data-b="2">🚀 Turbo</button><button data-b="3">🪩 Disco</button><button data-b="4">🛡️ Bumper</button>
+    </div>
+    <label>Stick left / right <input type="range" id="jx" min="-100" max="100" value="0"><output id="jxv">0</output></label>
+    <label>Stick back / forward <input type="range" id="jy" min="-100" max="100" value="0"><output id="jyv">0</output></label>
+    <div class="bytes" id="made"></div>
+    <p class="verdict" id="sum"></p>
+  </div>
+  <p>On the robot, <a href="https://github.com/gabeduke/alvik/blob/main/src/remote_control.py"><code>remote_control.py</code></a>
+    picks packets out of whatever arrives. This is the check:</p>
+  <pre><code>pkt = buf[i:i + 5]
+if (~sum(pkt[:4])) &amp; 0xFF != pkt[4]:
+    buf = buf[i + 1:]                  <span class="c"># damaged: look for the next '!'</span>
+    continue</code></pre>
+  <p>We did not invent the button packets. They are what the free <b>Bluefruit Connect</b> app from
+    Adafruit sends from its Control Pad, so the robot can be driven from that app as well. The
+    joystick packet is our own.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>Do a checksum by hand.</b> Lights down is <code>!</code> <code>B</code> <code>1</code> <code>1</code>. As numbers that is 33, 66, 49 and 49. Add them up. Take the answer away from 255. Is it what the packet maker shows?</li>
+    <li><b>Find the joystick's zero.</b> In the packet maker, slide the stick to -1. What number does the byte show? Bytes can't be negative, so -1 is sent as 255, -2 as 254, and so on.</li>
+    <li><b>Use two hands.</b> Tap <b>🙌 Two hands</b> at the top of the remote: left thumb for speed, right thumb for steering. Both layouts send the very same packet.</li>
+    <li><b>Walk away.</b> Carry the phone out of the room while the robot is driving. What does the robot do when Bluetooth can't reach any more? (Lesson 3 explains.)</li>
+    <li><b>Try the app.</b> Install Bluefruit Connect, connect to Alvik, then Controller, then Control Pad. Same robot code, different remote.</li>
+  </ul>
+</section>
+
+<script type="module">
+// The same sums as the remote's packet(): '!' <letter> <a> <b> <checksum>.
+const $ = (id) => document.getElementById(id);
+const hex = (b) => b.toString(16).padStart(2, "0").toUpperCase();
+function show(kind, a, b, names) {
+  const bytes = [0x21, kind.charCodeAt(0), a & 0xff, b & 0xff];
+  const total = bytes.reduce((x, y) => x + y, 0), sum = ~total & 0xff;
+  $("made").innerHTML = [...bytes, sum].map((v, i) =>
+    `<span${i === 4 ? ' class="sum"' : ""}>${v}<small>${["start !", kind === "B" ? "letter B" : "letter J", ...names, "checksum"][i]} · ${hex(v)}</small></span>`).join("");
+  $("sum").textContent = `${bytes.join(" + ")} = ${total}. Flip the bits and keep the last eight: ${sum}.`;
+}
+document.querySelectorAll("#maker button").forEach((el) =>
+  el.addEventListener("click", () => show("B", 48 + Number(el.dataset.b), 0x31, [`button ${el.dataset.b}`, "down"])));
+const stick = () => {
+  const x = Number($("jx").value), y = Number($("jy").value);
+  $("jxv").textContent = x; $("jyv").textContent = y;
+  show("J", x, y, ["x", "y"]);
+};
+$("jx").addEventListener("input", stick);
+$("jy").addEventListener("input", stick);
+stick();
+</script>
+
+<nav class="next">
+  <a href="1-wake-up.html"><small>← Lesson 1</small>🔧 Wake up the robot</a>
+  <a class="fwd" href="3-smooth.html"><small>Lesson 3 →</small>🚀 Smooth moves</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

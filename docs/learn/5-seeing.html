@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>👀 Seeing ahead · Alvik lessons</title>
+<meta name="description" content="Lesson 5: The distance sensor comes online as a cloud of dots. It sees more than you'd think, and it is wrong a lot.">
+<meta property="og:title" content="👀 Seeing ahead · Alvik lessons">
+<meta property="og:description" content="Lesson 5: The distance sensor comes online as a cloud of dots. It sees more than you'd think, and it is wrong a lot.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 5 of 9 · about 20 minutes</p>
+<h1>👀 Seeing ahead</h1>
+<p class="lead">The Alvik has a <b>distance sensor</b> in its nose. In this lesson its readings come
+  online as a cloud of dots in front of the 3D robot. You will find it sees more than you'd think,
+  and that it is wrong a surprising amount of the time.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>The robot and remote, or the pretend robot.</li>
+    <li>Your hand, a box or a big book, and a clear bit of floor.</li>
+  </ul>
+  <a class="go real" href="../?show=cloud">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=cloud">🎮 Pretend robot</a>
+</section>
+
+<section>
+  <h2>▶️ Do it</h2>
+  <ol class="steps">
+    <li>Connect, and leave the robot standing still on the floor, facing a wall about two hand-widths away. A row of pale dots hovers in front of the 3D robot. Each dot is one reading. (The pretend robot starts too far from its box: drive forward a little until the dots show.)</li>
+    <li>Move your hand slowly towards the robot's nose. The dots come closer with it.</li>
+    <li>Move your hand from the robot's left to its right, close to the nose. The dots on that side come close while the others stay back. The sensor sees <b>five zones</b>, side by side.</li>
+    <li>Look for two more rows: a few dots higher up, and a few low down by the floor. Those are the sensor looking a little upwards and a little downwards.</li>
+    <li>Now turn the robot to face a big empty stretch of floor. Do the dots go away?</li>
+  </ol>
+  <p class="note"><b>They don't.</b> With nothing ahead, the dots sit about 17 cm in front of the
+    robot. The sensor looks slightly downwards, and what it is seeing is <b>the floor</b>.</p>
+</section>
+
+<section>
+  <h2>🔍 How it works</h2>
+  <p>The sensor is a <b>time-of-flight</b> sensor. It sends out a flash of light you can't see and
+    times how long it takes to bounce back. Light is fast, so the times are tiny, but the sensor is
+    built for exactly that. Further away means a longer wait.</p>
+  <p>The Alvik library turns what the sensor sees into seven numbers, all in centimetres. Five go
+    across the front, from left to right. One looks higher up and one looks down at the floor just ahead:</p>
+  <pre><code>left, half_left, middle, half_right, right = alvik.get_distance()
+top = alvik.get_distance_top()
+bottom = alvik.get_distance_bottom()</code></pre>
+  <p>The robot sends the five across the front in a second packet, right after the one from
+    lesson 4. It has its own letter, <code>S</code> for sensors, and is eleven bytes long:</p>
+  <div class="bytes">
+    <span>!<small>start</small></span><span>S<small>sensors</small></span><span>▮▮▮▮▮<small>five distances, cm</small></span><span>▮<small>roll</small></span><span>▮<small>pitch</small></span><span>▮<small>battery %</small></span><span class="sum">▮<small>checksum</small></span>
+  </div>
+  <p class="muted small">The high and the low distance travel in a third packet, with the sensors of lesson 7.</p>
+  <p>The page draws every distance it gets as one dot, and lets each dot fade away after about a
+    second. That is why you see a <b>cloud</b> and not five neat dots: you are looking at the last
+    second of readings all at once. A tight clump means the sensor keeps saying the same thing. A
+    smeared clump means it can't make up its mind.</p>
+  <p class="muted small">Two honest notes about the picture. The page nudges each dot a little
+    sideways so they don't hide behind each other. And it draws everything closer than it really is,
+    so that 30 cm fits on the screen; anything past 40 cm gets no dot.</p>
+
+  <h3>Why sensors are never quite right</h3>
+  <p>Stand the robot still, facing a wall, and the dots still jiggle. Nothing moved. The readings
+    just change a little every time: that is <b>noise</b>, and every real sensor has it.</p>
+  <p>This sensor has two more habits, both found by watching the dots on the real robot:</p>
+  <ul>
+    <li><b>The floor.</b> With nothing ahead it reads the floor at 16 to 18 cm. Put a wall behind that spot and it reads the wall instead, because a wall bounces more light back.</li>
+    <li><b>Blips.</b> A zone that is looking at something far away now and then drops to the floor's reading for a moment, then goes back.</li>
+  </ul>
+  <p>A program that believed every reading would think there is always something 17 cm ahead.
+    Sorting that out is the next lesson.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>How close?</b> Bring your hand right up to the nose. What is the smallest distance the dots show?</li>
+    <li><b>Thin things.</b> Stand a pencil up in front of the robot. How many of the five zones see it? Now a chair leg. Now a book.</li>
+    <li><b>Tricky things.</b> Try a mirror, a window, a black sock, a shiny saucepan. Which ones fool it? Why might black be hard for a sensor that works by light bouncing back?</li>
+    <li><b>Find the floor.</b> Face open floor, then slowly tip the robot's nose up with a finger. Where do the dots go?</li>
+    <li><b>With the pretend robot:</b> drive to the middle of the room and turn slowly on the spot. Watch the little map and the dots together. Can you tell from the dots alone when it is looking at the chair leg?</li>
+  </ul>
+</section>
+
+<section class="change">
+  <h2>✏️ Peek with code</h2>
+  <p>You can read the sensor yourself. Plug the robot in, open <b>Arduino Lab for MicroPython</b>,
+    connect, paste this in and press Run. Numbers scroll past: five distances, over and over. Wave your hand.</p>
+  <pre><code>from arduino_alvik import ArduinoAlvik
+from time import sleep_ms
+
+alvik = ArduinoAlvik()
+alvik.begin()
+
+while True:
+    print(alvik.get_distance())
+    sleep_ms(200)</code></pre>
+  <p class="muted small">Press Stop when you have seen enough. Switch the robot off and on to get the colour menu back.</p>
+</section>
+
+<nav class="next">
+  <a href="4-talks-back.html"><small>← Lesson 4</small>📡 The robot talks back</a>
+  <a class="fwd" href="6-bumper.html"><small>Lesson 6 →</small>🛡️ The bumper</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

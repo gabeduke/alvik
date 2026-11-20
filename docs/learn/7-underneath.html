@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🌈 Underneath · Alvik lessons</title>
+<meta name="description" content="Lesson 7: The floor's colour, black lines, being picked up and tipped over.">
+<meta property="og:title" content="🌈 Underneath · Alvik lessons">
+<meta property="og:description" content="Lesson 7: The floor's colour, black lines, being picked up and tipped over.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 7 of 9 · about 20 minutes</p>
+<h1>🌈 Underneath</h1>
+<p class="lead">The last sensors come online: the ones that look <b>down</b>, and the one that feels
+  the robot being <b>tipped</b>. The 3D robot now shows the colour of the floor, black lines, and
+  whether someone has picked the robot up.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>The robot and remote, or the pretend robot.</li>
+    <li>Sheets of coloured paper (red, green and blue are best), white paper, and black tape or a thick black pen.</li>
+  </ul>
+  <a class="go real" href="../">🤖 Open the remote</a>
+  <a class="go" href="../?demo">🎮 Pretend robot</a>
+  <p class="muted small">Everything is switched on from here.</p>
+</section>
+
+<section>
+  <h2>▶️ Do it</h2>
+  <ol class="steps">
+    <li>Connect. Under the 3D robot there is now a <b>round patch of floor</b>. It is the colour the robot's colour sensor sees underneath it.</li>
+    <li>Drive onto a sheet of red paper. The patch turns red. Try the other colours.</li>
+    <li>Look at the 3D robot's nose: <b>three small rings</b>. They are the line sensors. Over a pale floor they are bright.</li>
+    <li>Stick a strip of black tape on white paper and drive across it slowly. The rings go dark one after the other, or all at once if you cross it straight on.</li>
+    <li>Pick the robot up. The 3D robot <b>rises</b> and leaves its shadow on the floor.</li>
+    <li>Tip it forwards, backwards and to each side. The 3D robot leans the same way.</li>
+    <li>Find the <b>🔋</b> number: the robot's battery.</li>
+  </ol>
+  <p class="muted small">With the pretend robot: drive over the tape and onto the three mats, and tap 🫳 to pick it up.</p>
+</section>
+
+<section>
+  <h2>🔍 How it works</h2>
+  <p>A third packet follows the other two, with the letter <code>U</code> for under:</p>
+  <div class="bytes">
+    <span>!<small>start</small></span><span>U<small>under</small></span><span>▮▮▮<small>three line sensors</small></span><span>▮▮▮<small>floor: red, green, blue</small></span><span>▮<small>low distance</small></span><span>▮<small>high distance</small></span><span class="sum">▮<small>checksum</small></span>
+  </div>
+  <h3>Line sensors</h3>
+  <p>Under the nose are three small sensors in a row. Each one shines a light down and measures how
+    much comes back. A pale floor bounces a lot back, and the number is <b>low</b>: about 50 on our
+    desk. Black tape soaks the light up, and the number is <b>high</b>. So does no floor at all.</p>
+  <p>The blue program in the robot's menu, the line follower, uses just these three numbers. If the
+    left sensor sees more black than the right one, the line is off to the left, so it steers left.</p>
+  <h3>Colour sensor</h3>
+  <p>Also underneath is a sensor that measures red, green and blue light separately. The Alvik library
+    gives each as a number from 0 to 1:</p>
+  <pre><code>red, green, blue = alvik.get_color()</code></pre>
+  <p>The page paints the patch with exactly those three numbers. A screen makes its colours out of
+    red, green and blue as well, so nothing needs converting.</p>
+  <h3>Picked up</h3>
+  <p>There is no "I am being carried" sensor. But remember the distance sensor's low zone from
+    lesson 5: standing on the floor it sees the floor just ahead, about 7 cm away. If that number
+    suddenly grows, the floor has gone further away, and the likely reason is that somebody lifted
+    the robot. The higher the number, the higher the 3D robot floats.</p>
+  <p>That is a sensor being used for something it was not built for. Engineers do this a lot.</p>
+  <h3>Tipped</h3>
+  <p>Inside the Alvik is a chip that feels which way is down and how fast the robot is turning, like
+    the one that tells a phone it has been turned sideways. From it come two angles: <b>roll</b>
+    (leaning to a side) and <b>pitch</b> (nose up or down). They ride in the <code>S</code> packet
+    from lesson 5. The page ignores a lean of less than 4 degrees, or the 3D robot would wobble on
+    every bump.</p>
+
+  <h3>A letter for each kind of news</h3>
+  <p>The robot now sends three packets, <code>T</code>, <code>S</code> and <code>U</code>, eight times
+    a second. Each was added later than the one before, and each time there were robots and pages
+    out there with the older code. The rule that kept them all working: <b>never change a packet,
+    add a new letter</b>. An old page skips letters it doesn't know. A new page copes with a robot
+    that never sends them.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>Colour hunt.</b> Drive around the house. What colour does the robot think the carpet is? The kitchen floor? A wooden table? Is it what you would call it?</li>
+    <li><b>Hard colours.</b> Try yellow, orange, pink and brown paper. Which come out wrong? What do white and black look like?</li>
+    <li><b>How thin?</b> Draw lines of different widths. What is the thinnest line that turns a ring dark?</li>
+    <li><b>The edge of the table.</b> Hold the robot (don't drive it!) with its nose poking over a table edge. What do the three rings show, and why? Could a robot use that to keep itself from falling off?</li>
+    <li><b>Lift or cliff?</b> The low distance grows when the robot is lifted. When else would it grow? How could the robot tell the difference?</li>
+  </ul>
+</section>
+
+<section class="change">
+  <h2>✏️ Peek with code</h2>
+  <p>Read the downward sensors yourself in Arduino Lab for MicroPython, as in lesson 5. Slide
+    coloured paper under the robot and lift it up while this runs:</p>
+  <pre><code>from arduino_alvik import ArduinoAlvik
+from time import sleep_ms
+
+alvik = ArduinoAlvik()
+alvik.begin()
+
+while True:
+    print("lines", alvik.get_line_sensors(),
+          "colour", alvik.get_color(),
+          "floor", alvik.get_distance_bottom())
+    sleep_ms(300)</code></pre>
+  <p class="muted small">How dark a line has to be before the rings go dark, and how far a lift raises the 3D
+    robot, are numbers in <a href="https://github.com/gabeduke/alvik/blob/main/docs/sensing.js"><code>sensing.js</code></a>.
+    Some of them are still our best guess: use what your own robot prints to set them better.</p>
+</section>
+
+<nav class="next">
+  <a href="6-bumper.html"><small>← Lesson 6</small>🛡️ The bumper</a>
+  <a class="fwd" href="8-sketch.html"><small>Lesson 8 →</small>🙀 Teach it a trick</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

@@ -1,0 +1,132 @@
+/* The lessons (docs/learn/). Same colours as the remote, but a page you read and scroll. */
+:root {
+  --bg: #1b1630; --panel: #2a2347; --text: #fff; --muted: #b8b0d8;
+  --up: #3fa9f5; --lights: #ffd23f; --turbo: #ff6b35; --disco: #c86bfa; --bumper: #3ddc84; --bad: #ff5c5c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  font-size: 18px; line-height: 1.55;
+  padding: 16px 16px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px;
+}
+body > * { width: 100%; max-width: 760px; }
+a { color: var(--up); }
+
+.top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.top .home { flex: 1; font-size: 22px; font-weight: 800; color: var(--text); text-decoration: none; white-space: nowrap; }
+.top a.chip, .pill {
+  font-size: 15px; font-weight: 700; text-decoration: none; color: var(--muted);
+  background: var(--panel); border-radius: 12px; padding: 9px 12px; white-space: nowrap;
+}
+
+.kicker { margin: 6px 0 -10px; color: var(--muted); font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+h1 { margin: 0; font-size: 34px; line-height: 1.15; }
+.lead { margin: 0; font-size: 20px; color: var(--muted); }
+.lead b { color: var(--text); }
+
+section { background: var(--panel); border-radius: 18px; padding: 16px 20px 18px; }
+section > :first-child { margin-top: 0; }
+section > :last-child { margin-bottom: 0; }
+h2 { margin: 0 0 8px; font-size: 22px; }
+h3 { margin: 18px 0 6px; font-size: 18px; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 24px; }
+li + li { margin-top: 6px; }
+ol.steps { list-style: none; padding: 0; counter-reset: step; }
+ol.steps > li { counter-increment: step; position: relative; padding-left: 46px; min-height: 34px; }
+ol.steps > li + li { margin-top: 14px; }
+ol.steps > li::before {
+  content: counter(step); position: absolute; left: 0; top: 0; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--up); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center;
+}
+.muted { color: var(--muted); }
+.small { font-size: 15px; }
+
+/* kinds of box */
+section.need { background: none; border: 2px solid rgba(255,255,255,.12); }
+section.try { background: rgba(200,107,250,.13); border: 2px solid rgba(200,107,250,.4); }
+section.change { background: rgba(255,210,63,.09); border: 2px solid rgba(255,210,63,.35); }
+section.see { background: rgba(61,220,132,.09); border: 2px solid rgba(61,220,132,.4); }
+.note { border-left: 4px solid var(--lights); padding: 2px 0 2px 14px; color: var(--muted); margin: 12px 0; }
+.note b { color: var(--text); }
+
+/* a big link to the remote, set up for this lesson */
+.go {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; text-decoration: none;
+  color: #1b1630; background: var(--disco); border-radius: 14px; padding: 11px 18px; margin: 4px 8px 4px 0;
+  box-shadow: 0 4px 0 rgba(0,0,0,.35);
+}
+.go.real { background: var(--up); color: #fff; }
+
+code, pre, kbd { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .86em; }
+code { background: rgba(255,255,255,.1); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+pre { background: #120e22; border-radius: 12px; padding: 12px 14px; overflow: auto; line-height: 1.45; margin: 0 0 12px; }
+pre code { background: none; padding: 0; overflow-wrap: normal; font-size: 1em; }
+pre .c { color: #8f86b8; }                       /* a comment in the code */
+kbd { background: rgba(255,255,255,.14); border-radius: 6px; padding: 1px 7px; box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+
+table { border-collapse: collapse; width: 100%; margin: 0 0 12px; font-size: 16px; }
+th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid rgba(255,255,255,.1); vertical-align: top; }
+th { color: var(--muted); font-size: 14px; }
+.scroll { overflow-x: auto; }
+
+/* the bytes of a packet, one box each */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.bytes span {
+  display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 6px 8px; border-radius: 10px;
+  background: #120e22; font-family: ui-monospace, Menlo, monospace; font-size: 18px; font-weight: 700;
+}
+.bytes span small { font-family: ui-rounded, system-ui, sans-serif; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.bytes .sum { background: rgba(61,220,132,.2); }
+
+/* things to play with on the page */
+.play { background: #120e22; border-radius: 14px; padding: 14px; margin: 0 0 12px; }
+.play label { display: grid; grid-template-columns: 9.5em 1fr 4.2em; align-items: center; gap: 10px; font-size: 16px; margin: 6px 0; }
+.play input[type=range] { width: 100%; accent-color: var(--up); }
+.play output { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+.play .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.play button {
+  font: inherit; font-size: 16px; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer;
+  background: var(--panel); color: var(--text); box-shadow: 0 3px 0 rgba(0,0,0,.4);
+}
+.play button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+.play canvas { width: 100%; height: 170px; display: block; border-radius: 10px; background: #0d0a1a; }
+.play .verdict { font-size: 17px; margin: 8px 0 0; }
+.play .verdict b.stop { color: var(--bad); } .play .verdict b.slow { color: var(--lights); } .play .verdict b.clear { color: var(--bumper); }
+
+/* previous / next */
+.next { display: flex; gap: 12px; justify-content: space-between; }
+.next a {
+  flex: 1; max-width: 48%; text-decoration: none; color: var(--text); background: var(--panel); border-radius: 16px;
+  padding: 12px 16px; font-weight: 700;
+}
+.next a small { display: block; color: var(--muted); font-weight: 400; font-size: 14px; }
+.next a.fwd { text-align: right; margin-left: auto; background: var(--up); }
+.next a.fwd small { color: rgba(255,255,255,.85); }
+
+/* the list of lessons */
+.lessons { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; }
+.lessons li { margin: 0; }
+.lessons a {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 16px; align-items: center; text-decoration: none;
+  color: var(--text); background: var(--panel); border-radius: 18px; padding: 14px 18px;
+}
+.lessons a:hover, .next a:hover { filter: brightness(1.15); }
+.lessons .emoji { grid-row: span 2; font-size: 38px; line-height: 1; }
+.lessons b { font-size: 20px; }
+.lessons b small { color: var(--muted); font-weight: 700; font-size: 14px; margin-right: 6px; }
+.lessons span.what { color: var(--muted); font-size: 16px; }
+.lessons .new { display: inline-block; font-size: 13px; font-weight: 700; color: var(--bumper); margin-left: 6px; white-space: nowrap; }
+
+footer { color: var(--muted); font-size: 14px; text-align: center; }
+footer a { color: inherit; }
+
+@media (max-width: 480px) {
+  body { font-size: 17px; padding: 12px 12px 40px; }
+  h1 { font-size: 28px; }
+  section { padding: 14px 16px 16px; }
+  .play label { grid-template-columns: 7.5em 1fr 3.6em; font-size: 15px; }
+  .next a small { display: none; }
+}

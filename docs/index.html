@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#1b1630">
-<title>Alvik Remote</title>
+<title>Alvik Remote: drive the Arduino Alvik from a web page, with a live 3D robot</title>
+<meta name="description" content="A free web remote for the Arduino Alvik robot. Drive it over Bluetooth from a phone or laptop and watch a live 3D robot show what its sensors see. No robot? Try the pretend one. With step-by-step lessons.">
+<link rel="canonical" href="https://gabeduke.github.io/alvik/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Alvik Remote: drive the Arduino Alvik and see what it senses">
+<meta property="og:description" content="A web remote for the Arduino Alvik robot with a live 3D robot that shows its sensors. Try it with a pretend robot, then follow the lessons.">
+<meta property="og:url" content="https://gabeduke.github.io/alvik/">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -133,7 +141,7 @@
     box-shadow: 0 4px 0 rgba(0,0,0,.35);
   }
   #twin[hidden] { display: none; }
-  #twin canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }   /* never sets the card's size */
+  #twin canvas:not(#twinMap) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }   /* never sets the card's size */
   #twin::after {            /* the frame, drawn over the picture */
     content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     box-shadow: inset 0 0 0 3px rgba(255,255,255,.1);
@@ -162,6 +170,59 @@
   }
   #layout button[aria-pressed="true"] { background: var(--up); color: #fff; }
   footer { color: var(--muted); font-size: 14px; text-align: center; }
+  footer a, #lesson a { color: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; text-decoration: underline; }
+  /* new here: try a pretend robot, or read the lessons (gone once this device has met a real robot) */
+  #hello { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #hello[hidden], #lesson[hidden] { display: none; }
+  @media (max-width: 560px), (max-height: 480px) {      /* no room to spare: it floats over the joystick, which does nothing yet */
+    #hello { position: fixed; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 2; pointer-events: none; }
+    #hello > * { pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
+    #hello a { display: none; }
+  }
+  .pill {
+    font: inherit; font-size: 16px; font-weight: 700; text-decoration: none; color: var(--text); cursor: pointer;
+    background: var(--panel); border: 0; border-radius: 12px; padding: 9px 14px; white-space: nowrap;
+  }
+  .pill.go { background: var(--disco); color: #1b1630; }
+  #lesson { color: var(--muted); font-size: 15px; text-align: center; }
+  /* the pretend robot's room, as a little map over the 3D picture */
+  #twinMap {            /* as big as fits above the numbers, and never wider than a third or so */
+    position: absolute; left: 8px; top: 26px; height: min(calc(100% - 60px), clamp(56px, 23vw, 136px)); aspect-ratio: 7 / 5;
+    border-radius: 8px; opacity: .92; pointer-events: none;
+  }
+  #twinMap[hidden], #twinHold[hidden] { display: none; }
+  #twinHold {
+    position: absolute; right: 6px; top: 46px; font: inherit; font-size: 18px; line-height: 1; padding: 6px;
+    border: 0; border-radius: 10px; background: rgba(42,35,71,.8); cursor: pointer;
+  }
+  #twinHold[aria-pressed="true"] { background: var(--lights); }
+  @media (max-height: 480px) { #twinMap { top: 8px; height: min(calc(100% - 42px), clamp(56px, 23vw, 136px)); } }
+  body.connected footer .how { display: none; }       /* how to get the robot ready: no use once it is */
+  body.connected:not(.demo) footer { display: none; } /* and no links to tap by mistake while a real robot is driving */
+  #about:not([open]) { display: none; }               /* for browsers that don't know <dialog> */
+  #about .way[hidden] { display: none; }
+  /* what this page is, for someone who has just found it */
+  #about {
+    border: 0; border-radius: 22px; padding: 22px; width: min(520px, calc(100% - 24px)); max-height: calc(100% - 24px);
+    background: var(--panel); color: var(--text); overflow: auto; touch-action: pan-y;
+    box-shadow: 0 12px 48px rgba(0,0,0,.6); user-select: text; -webkit-user-select: text;
+  }
+  #about::backdrop { background: rgba(10,8,20,.72); }
+  #about h2 { margin: 0 0 8px; font-size: 24px; line-height: 1.2; }
+  #about p { margin: 0 0 14px; color: var(--muted); font-size: 17px; line-height: 1.45; }
+  #about p b { color: var(--text); }
+  #about .ways { display: grid; gap: 10px; margin-bottom: 14px; }
+  #about .way {
+    font: inherit; text-align: left; text-decoration: none; color: var(--text); cursor: pointer; border: 0;
+    display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: center;
+    background: rgba(255,255,255,.07); border-radius: 16px; padding: 12px 14px;
+  }
+  #about .way.go { background: var(--disco); color: #1b1630; }
+  #about .way .emoji { grid-row: span 2; font-size: 30px; }
+  #about .way b { font-size: 18px; }
+  #about .way span:last-child { font-size: 15px; opacity: .8; }
+  #about .small { font-size: 14px; margin: 0; }
+  #about a { color: var(--up); }
   #tools {
     font-size: 15px; font-weight: 700; text-decoration: none; color: var(--muted);
     background: var(--panel); border-radius: 12px; padding: 10px 12px; white-space: nowrap;
@@ -181,6 +242,11 @@
 </header>
 
 <div id="msg"></div>
+<div id="hello" hidden>
+  <button class="pill go" id="tryDemo">🎮 No robot? Try a pretend one</button>
+  <a class="pill" href="learn/">📚 Lessons</a>
+</div>
+<div id="lesson" hidden>📚 Lesson view: some of the sensors are switched off. <a id="lessonAll">Show them all</a></div>
 
 <main>
   <div class="stick disabled" id="stick" role="application" aria-label="Drive: drag the ball. Push a little to go slow, a lot to go fast.">
@@ -200,6 +266,8 @@
     <span id="twinCredit">3D: <a href="https://docs.arduino.cc/hardware/alvik/" target="_blank" rel="noopener">Arduino</a> +
       <a href="https://makerworld.com/en/models/1298936" target="_blank" rel="noopener">GiulioT</a> · CC BY-NC-SA</span>
     <button id="twinNorth" title="Tap when the robot is pointing away from you">🧭</button>
+    <canvas id="twinMap" hidden aria-label="A map of the pretend room, seen from above: walls, a box, a chair leg, coloured mats, black tape, and the pretend robot."></canvas>
+    <button id="twinHold" hidden aria-pressed="false" title="Pick the pretend robot up, or put it down">🫳</button>
   </div>
 
   <div class="actions">
@@ -210,7 +278,24 @@
   </div>
 </main>
 
-<footer>On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</footer>
+<footer><span class="how">On the robot: tap ⬆ until the lights are <b>purple</b>, then tap ✓. Yellow = ready to connect.</span>
+  <a id="aboutLink" href="#about">❓ What is this?</a> <a href="learn/">📚 Lessons</a></footer>
+
+<dialog id="about" aria-labelledby="aboutTitle">
+  <h2 id="aboutTitle">👋 A remote control for the Arduino Alvik robot</h2>
+  <p>Drive an <b>Alvik</b> from a phone, tablet or laptop over Bluetooth. A <b>live 3D robot</b> on the
+    screen copies the real one and shows what its sensors see: walls ahead, the colour of the floor,
+    a black line, being picked up. Free, nothing to install, made by a family for their kids.</p>
+  <div class="ways">
+    <button class="way go" id="aboutTry"><span class="emoji">🎮</span><b>Try it with a pretend robot</b><span>No Alvik needed. Drive around a pretend room.</span></button>
+    <a class="way" href="learn/"><span class="emoji">📚</span><b>Lessons</b><span>How it works, one step at a time, with things to try.</span></a>
+    <a class="way" href="flash.html"><span class="emoji">🔧</span><b>Put it on your Alvik</b><span>Over USB from Chrome or Edge on a computer. About 2 minutes.</span></a>
+    <button class="way" id="aboutClose"><span class="emoji">🤖</span><b>My robot is ready: let me drive</b><span>Purple on the robot's menu, then ✓. Yellow lights = ready.</span></button>
+  </div>
+  <p class="small">Bluetooth needs Chrome or Edge (Android, Mac, Windows, Chromebook); on iPad or iPhone use the free Bluefy app.
+    The pretend robot works in any browser. The code is on <a href="https://github.com/gabeduke/alvik" target="_blank" rel="noopener">GitHub</a>.
+    Not made by or connected with Arduino.</p>
+</dialog>
 
 <script type="module">
 import { initPwa } from "./pwa.js";
@@ -239,6 +324,19 @@ let pwa = null;                         // set up at the bottom
 let twin = null;                        // the 3D robot, once it has loaded (the remote works without it)
 let heard = false;                      // has this robot sent telemetry? (one with old code never does)
 let toggledAt = 0;                      // when Turbo or Bumper was last pressed here
+let demo = null;                        // the pretend robot's room, while "try it without a robot" is on (playroom.js)
+const asked = new URLSearchParams(location.search);
+// A lesson's link can leave sensors off the 3D robot, to add them one at a time:
+// ?show=cloud,heat,under (any of them, or none). No "show" at all = everything.
+const layers = asked.has("show") ? new Set(asked.get("show").split(",")) : null;
+const stored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const store = (key, value) => { try { value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); return true; } catch { return false; } };
+// A guest is a device that first came here as a visitor and has not driven a real robot yet: it is
+// offered the pretend robot. A device that was already somebody's remote is never a guest.
+const newHere = store("alvik-test", "1") && store("alvik-test", null) && stored("alvik-layout") === null;       // never opened the remote before
+if (newHere) store("alvik-guest", "1");
+let guest = stored("alvik-guest") !== null;
+let connecting = false;                 // between pressing Connect and the robot answering
 
 function packet(kind, a, b) {
   const bytes = [0x21, kind.charCodeAt(0), a & 0xff, b & 0xff];
@@ -369,9 +467,13 @@ addEventListener("resize", updateStick);
 function setConnected(on) {
   if (!on) pwa?.idle();
   $("dot").classList.toggle("on", on);
-  $("statusText").textContent = on ? "Connected" : "Not connected";
-  $("connect").textContent = on ? "Disconnect" : "Connect";
+  document.body.classList.toggle("connected", on);
+  $("statusText").textContent = on ? (demo ? "Pretend robot" : "Connected") : "Not connected";
+  $("connect").textContent = on ? (demo ? "Stop" : "Disconnect") : "Connect";
   $("connect").classList.toggle("connected", on);
+  $("connect").disabled = !on && !navigator.bluetooth;
+  document.body.classList.toggle("demo", on && !!demo);
+  $("hello").hidden = on || !guest;
   allButtons.forEach((b) => (b.disabled = !on));
   controls.forEach((c) => c.classList.toggle("disabled", !on));
   sent = [0, 0]; stickBusy = false;      // a robot we just met is standing still
@@ -398,7 +500,7 @@ function showToggles() {
 // ---------- what the robot says back ----------
 function showDistance(t) {
   const info = $("twinInfo"), cm = t?.distance ?? null;
-  info.textContent = cm === null || cm > 99 ? "" : `🧱 ${cm} cm`;
+  info.textContent = cm === null || cm > 99 || (layers && !layers.has("heat")) ? "" : `🧱 ${cm} cm`;
   info.className = t?.blocked || (cm !== null && cm < 12) ? "stop" : cm !== null && cm < 30 ? "slow" : "";
   const speed = Math.round(Math.abs(t?.speed ?? 0));
   $("twinSpeed").textContent = speed ? `💨 ${speed} cm/s` : "";
@@ -420,7 +522,8 @@ function showBattery(pct) {
 }
 
 function onTelemetry(t) {
-  if (!heard) $("msg").textContent = "";
+  if (!heard && !demo) $("msg").textContent = "";
+  if (demo && t.speed) $("msg").textContent = "";          // off it goes: the hint has done its job
   heard = true;
   // The robot knows best, so the labels can't drift. Just after a press we wait a moment: the
   // packet in the air may be from before the robot heard it.
@@ -450,19 +553,59 @@ async function listen(service) {
   }
 }
 
+// ---------- try it without a robot ----------
+// The pretend robot takes the same packets and sends the same telemetry, so all it needs is to
+// stand where the Bluetooth characteristic would: write() and the reader don't know the difference.
+const taken = () => !!demo || !!rx || connecting || !!device?.gatt?.connected;      // a robot, real or pretend, has the page
+async function startDemo() {
+  if (taken()) return;
+  try {
+    const { openPlayroom } = await import("./playroom.js");
+    if (taken()) return;
+    const feed = telemetryReader(onTelemetry, onSensors, onUnder);
+    twinEl.hidden = false;              // the map lives there, even if the 3D robot could not load
+    $("twinMap").hidden = $("twinHold").hidden = false;
+    demo = openPlayroom({ canvas: $("twinMap"), onData: feed });
+    rx = { writeValueWithoutResponse: async (data) => demo?.write(data) };
+    setConnected(true);
+    $("msg").textContent = layers ? "" : "🎮 A pretend robot in a pretend room. Drive it at the box, over the black tape and onto the colours.";
+    write(telemetryRequest(true));
+  } catch (e) {
+    console.warn("no pretend robot", e);
+    $("msg").textContent = "The pretend robot didn't load. Check the internet and try again.";
+  }
+}
+
+function stopDemo() {
+  demo.close();
+  demo = null; rx = null;
+  $("twinMap").hidden = $("twinHold").hidden = true;
+  $("twinHold").setAttribute("aria-pressed", "false");
+  if (!twin) twinEl.hidden = true;
+  $("msg").textContent = "";
+  setConnected(false);
+  explainNoBluetooth();
+}
+
 async function connect() {
+  if (demo) { stopDemo(); return; }
   if (device?.gatt?.connected) { device.gatt.disconnect(); return; }
+  if (connecting) return;
+  connecting = true;
+  $("hello").hidden = true;
   try {
     $("msg").textContent = "";
     device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [NUS] }, { namePrefix: "Alvik" }],
       optionalServices: [NUS],
     });
-    device.addEventListener("gattserverdisconnected", () => { rx = null; setConnected(false); });
+    device.addEventListener("gattserverdisconnected", () => { if (demo) return; rx = null; setConnected(false); });
     $("statusText").textContent = "Connecting…";
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(NUS);
     rx = await service.getCharacteristic(RX);
+    guest = false; store("alvik-guest", null);                     // from now on this is somebody's own remote
+    connecting = false;
     setConnected(true);
     listen(service);
   } catch (e) {
@@ -470,6 +613,7 @@ async function connect() {
       $("msg").textContent = "Couldn't connect: " + e.message +
         ". Is the robot on purple mode with yellow lights?";
     }
+    connecting = false;
     setConnected(false);
   }
 }
@@ -539,28 +683,58 @@ let savedLayout = "stick";
 try { savedLayout = localStorage.getItem("alvik-layout") || "stick"; } catch {}
 setLayout(savedLayout);
 
-if (!navigator.bluetooth) {
-  $("connect").disabled = true;
+function explainNoBluetooth() {
+  if (navigator.bluetooth) return;
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   $("msg").innerHTML = ios
     ? "This browser can't talk to Bluetooth robots. On iPad, open this page in the free <b>Bluefy</b> app instead."
     : "This browser can't talk to Bluetooth robots. Try <b>Chrome</b> or <b>Edge</b>.";
 }
+explainNoBluetooth();
 
 // The 3D robot loads after everything else, and the remote is fine without it (old phone, no WebGL).
 const twinEl = $("twin");
 import("./twin.js")
   .then(({ createTwin }) => { twinEl.hidden = false; return createTwin(twinEl.querySelector("canvas")); })
-  .then((t) => { twin = t; })
+  .then((t) => {
+    twin = t;
+    if (layers) twin.show({ cloud: layers.has("cloud"), heat: layers.has("heat"), under: layers.has("under") });
+  })
   .catch((e) => { twinEl.hidden = true; console.warn("no 3D robot", e); });
 twinEl.addEventListener("click", (e) => {
   if (e.target.id === "twinNorth") twin?.recentre();
+  if (e.target.id === "twinHold" && demo) {
+    const up = e.target.getAttribute("aria-pressed") !== "true";
+    e.target.setAttribute("aria-pressed", String(up));
+    demo.hold(up);
+  }
 });
+
+// What this page is: opens by itself the first time a device comes here, and from the footer.
+const about = $("about");
+const openAbout = () => {
+  $("aboutTry").hidden = taken();
+  if (!about.open) about.showModal?.();
+};
+$("aboutLink").addEventListener("click", (e) => { e.preventDefault(); openAbout(); });
+$("aboutClose").addEventListener("click", () => about.close());
+$("aboutTry").addEventListener("click", () => { about.close(); startDemo(); });
+about.addEventListener("click", (e) => {                 // a tap outside it (on the dimmed page) closes it
+  const r = about.getBoundingClientRect();
+  if (e.target === about && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) about.close();
+});
+$("tryDemo").addEventListener("click", startDemo);
+if (layers) {
+  $("lesson").hidden = false;
+  $("lessonAll").href = asked.has("demo") ? "./?demo" : "./";
+}
+if (asked.has("demo")) startDemo();
+else if (newHere && !layers && !matchMedia("(display-mode: standalone)").matches) openAbout();
 
 // Installable app + self-updating (pwa.js). Never reload while connected: that drops Bluetooth
 // and the robot brakes, so the reload waits until it disconnects.
-pwa = initPwa({ isBusy: () => !!device?.gatt?.connected, whenBusy: "It will reload after you disconnect." });
+pwa = initPwa({ isBusy: () => !!device?.gatt?.connected || !!demo, whenBusy: "It will reload after you disconnect." });
 </script>
 </body>
 </html>

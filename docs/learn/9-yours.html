@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🛠️ Make it yours · Alvik lessons</title>
+<meta name="description" content="Lesson 9: Your own copy of the whole thing: the website, the 3D model, a new sensor.">
+<meta property="og:title" content="🛠️ Make it yours · Alvik lessons">
+<meta property="og:description" content="Lesson 9: Your own copy of the whole thing: the website, the 3D model, a new sensor.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 9 of 9 · about 30 minutes</p>
+<h1>🛠️ Make it yours</h1>
+<p class="lead">Everything in these lessons is yours to change: the robot's code, the remote, the 3D
+  robot, the pretend room. This last lesson gets you <b>your own copy of the whole project</b>, with
+  your own website and your own update page.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>A free <a href="https://github.com/">GitHub</a> account. (A grown-up's job: GitHub accounts are for people aged 13 and over.)</li>
+    <li>For the second half: a computer with Python 3 and Node.js 20 or newer. Nothing else gets installed.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>▶️ Your own copy, with its own website</h2>
+  <ol class="steps">
+    <li>Open <a href="https://github.com/gabeduke/alvik">github.com/gabeduke/alvik</a> and press <b>Fork</b>. Now you have a copy that is yours.</li>
+    <li>In your copy: <b>Settings</b>, then <b>Pages</b>, and set <b>Source</b> to <b>GitHub Actions</b>.</li>
+    <li>Open the <b>Actions</b> tab and allow workflows to run.</li>
+    <li>Change something small that you will see. On GitHub, open <code>docs/index.html</code>, press the pencil, find <code>&lt;span id="title"&gt; Alvik&lt;/span&gt;</code> and put your robot's name in place of Alvik. Commit it.</li>
+    <li>Wait about a minute, then open <code>https://YOUR-NAME.github.io/alvik/</code>. That is your remote, with your robot's name at the top. Its 🔧 page puts <i>your</i> code on the robot.</li>
+  </ol>
+  <p>Every time you commit a change, GitHub runs the project's tests, builds the site and puts it
+    online. If a test fails, nothing is put online, so a mistake can't reach the robot that way.
+    Look in the <b>Actions</b> tab to see what happened.</p>
+  <p class="note"><b>The tests know the robot's numbers.</b> Change <code>SPEED</code> or a light colour
+    and a test will fail on purpose. Read what it says: it names what else has to change with it,
+    like a lesson that quotes the old number, or the pretend robot's copy. Change those too (or the
+    test, if you meant it) and it goes online.</p>
+</section>
+
+<section>
+  <h2>💻 Work on it on your own computer</h2>
+  <pre><code>git clone https://github.com/YOUR-NAME/alvik
+cd alvik
+scripts/build_site.sh &amp;&amp; python3 -m http.server -d _site 8000    <span class="c"># then open http://localhost:8000</span>
+
+node --test tests/*.test.mjs       <span class="c"># the page's side</span>
+python3 tests/test_robot.py        <span class="c"># the robot's side, on a pretend Alvik</span></code></pre>
+  <p>Bluetooth and USB both work from <code>localhost</code>, so you can drive the real robot from
+    the copy on your computer. There is nothing to install and no build tool: the site is plain
+    files, and the build script only copies them.</p>
+</section>
+
+<section>
+  <h2>🗺️ Where things are</h2>
+  <div class="scroll"><table>
+    <tr><th>Folder</th><th>What is in it</th></tr>
+    <tr><td><code>src/</code></td><td>What runs on the robot. <code>demo.py</code> is the menu, <code>remote_control.py</code> is the remote and the bumper.</td></tr>
+    <tr><td><code>sketches/</code></td><td>The extras, one folder each (lesson 8).</td></tr>
+    <tr><td><code>docs/</code></td><td>The website. <code>index.html</code> is the remote, <code>twin.js</code> draws the 3D robot, <code>telemetry.js</code> reads the robot's packets, <code>sensing.js</code> turns readings into colours and heights.</td></tr>
+    <tr><td><code>docs/pretend.js</code></td><td>The pretend robot and its room.</td></tr>
+    <tr><td><code>docs/learn/</code></td><td>These lessons.</td></tr>
+    <tr><td><code>models/</code></td><td>Where the 3D robot comes from, and the Blender script that builds it.</td></tr>
+    <tr><td><code>tests/</code></td><td>Tests for both sides, with a pretend robot and a pretend USB cable.</td></tr>
+  </table></div>
+</section>
+
+<section class="try">
+  <h2>🧪 Things to change, easiest first</h2>
+  <ul>
+    <li><b>Rebuild the pretend room.</b> At the top of <code>docs/pretend.js</code> is <code>ROOM</code>: the walls, the box, the mats and the tape, in centimetres. Add a mat in your favourite colour. Add a maze (a test drives the pretend robot straight at the box, so leave that path clear or change the test).</li>
+    <li><b>New light colours.</b> <code>COLORS</code> in <code>remote_control.py</code> is the list the 💡 button steps through. The pretend robot keeps a copy in <code>docs/pretend.js</code>.</li>
+    <li><b>A new dance.</b> <code>src/dance.py</code> is short: lights that change on a beat, a wiggle, a spin. The pretend robot has a copy of that too.</li>
+    <li><b>Tune the 3D robot.</b> <code>docs/sensing.js</code> has the numbers for the heat's colours, how far a lift raises it, and what counts as a dark line.</li>
+    <li><b>Paint the 3D robot.</b> The model is built by a script, <code>models/build_alvik_web.py</code>, from Arduino's own drawing of the Alvik and a LEGO-style top plate by GiulioT. The plate's licence (CC BY-NC-SA) asks you to keep the credit and not to sell it. <code>models/README.md</code> has the details.</li>
+    <li><b>A whole new sensor.</b> Give it a new packet letter (lesson 7 says why). Four places change together: the robot builds the packet in <code>remote_control.py</code>, the page reads it in <code>telemetry.js</code>, an example goes in <code>tests/telemetry_vectors.json</code> so both are tested against it, and <code>twin.js</code> draws it.</li>
+  </ul>
+</section>
+
+<section class="see">
+  <h2>🚀 Where next</h2>
+  <p>The project's own list of ideas is in its
+    <a href="https://github.com/gabeduke/alvik/issues">GitHub issues</a>: tricks like a figure-eight,
+    a LEGO arm on a servo, eyes on a little screen, and skins so kids can design their own 3D robot.</p>
+  <p>If you build something, or find a mistake in a lesson, open an issue there and say so.</p>
+</section>
+
+<nav class="next">
+  <a href="8-sketch.html"><small>← Lesson 8</small>🙀 Teach it a trick</a>
+  <a class="fwd" href="./"><small>Done!</small>📚 All the lessons</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

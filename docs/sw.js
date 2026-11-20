@@ -12,6 +12,9 @@ const BUILD = "__BUILD__";
 const CACHE = "alvik-" + BUILD;
 const SHELL = [
   "./", "flash.html", "pwa.js", "flasher.js", "telemetry.js", "sensing.js", "twin.js", "models/alvik.glb",
+  "pretend.js", "bumper.js", "playroom.js",
+  "learn/", "learn/learn.css", "learn/1-wake-up.html", "learn/2-drive.html", "learn/3-smooth.html", "learn/4-talks-back.html",
+  "learn/5-seeing.html", "learn/6-bumper.html", "learn/7-underneath.html", "learn/8-sketch.html", "learn/9-yours.html",
   "vendor/three/three.module.min.js", "vendor/three/loaders/GLTFLoader.js", "vendor/three/utils/BufferGeometryUtils.js",
   "manifest.webmanifest", "favicon.svg", "icons/icon-192.png", "icons/icon-512.png",
 ];

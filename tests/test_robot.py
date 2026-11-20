@@ -170,7 +170,7 @@ class RobotTest(unittest.TestCase):
         self.sketch_dir = os.path.join(self.root, "sketches")
         self._path = list(sys.path)
         sys.path.insert(0, self.root)
-        for m in ROBOT_MODULES + ["disco", "follow_me", "boom", "ghost"] + ["s%d" % i for i in range(20)]:
+        for m in ROBOT_MODULES + ["disco", "follow_me", "scaredy_cat", "boom", "ghost"] + ["s%d" % i for i in range(20)]:
             sys.modules.pop(m, None)
         CLOCK.now = 0
         CLOCK.end = None
@@ -358,6 +358,24 @@ class Sketches(RobotTest):
         self.assertIn((-7, 80), drives)
         self.assertEqual(robot.colour_at(7900), ((0, 1, 0), (0, 1, 0)), "green while following")
         self.assertEqual(robot.colour_at(11000), (YELLOW, YELLOW), "yellow while waiting")
+
+    def test_scaredy_cat(self):
+        self.install("scaredy_cat")
+
+        def distances(t):
+            if t < 6000:
+                return (17, 16.5, 17.2, 16.8, 17)       # open floor: the floor's reading is not scary
+            if t < 8000:
+                return (40, 30, 9, 30, 40)              # a hand right in front: back away
+            return (None,) * 5                          # nothing there at all
+        s = Script().press("up").press("up").press("up")  # -> scaredy_cat, the only sketch
+        s.press("ok").wait(8000).press("cancel")
+        robot, _, _ = self.boot(s, setup=lambda a: setattr(a, "distance", distances))
+        self.assertEqual({(l, a) for t, l, a in robot.drives if 4500 < t < 6000}, {(0, 0)})
+        self.assertEqual(robot.colour_at(5900), ((0, 1, 0), (0, 1, 0)), "green while calm")
+        self.assertEqual({(l, a) for t, l, a in robot.drives if 6100 < t < 8000}, {(-8, 0)})
+        self.assertEqual(robot.colour_at(7900), (RED, RED), "red while backing away")
+        self.assertEqual(robot.colour_at(9000), ((0, 1, 0), (0, 1, 0)), "calm again")
 
     def test_crashing_and_missing_sketches_flash_red_and_return(self):
         self.install("boom", {"title": "Boom", "emoji": "x", "description": "d", "color": [0, 1, 1], "entry": "boom"},
@@ -709,6 +727,76 @@ class WhatIsAhead(RobotTest):
         self.assertGreater(steps[0], 24.5, "one look later it has only started to move")
         self.assertEqual(steps, sorted(steps, reverse=True))
         self.assertAlmostEqual(steps[-1], 22.5, delta=0.1)
+
+
+class SharedSums(RobotTest):
+    """The driving sums are copied in JavaScript (docs/bumper.js) for the pretend robot on the web
+    page. tests/bumper_vectors.json holds examples with this code's answers, and both sides are
+    tested against it (the other side: tests/pretend.test.mjs). After changing ramp, bumper_limit,
+    Zone or Bumper: change docs/bumper.js the same way, then write the file again with
+        WRITE_VECTORS=1 python3 tests/test_robot.py SharedSums"""
+    PATH = os.path.join(REPO, "tests", "bumper_vectors.json")
+
+    def scenes(self):
+        wobble = lambda i: (i * 7 % 23) / 10 - 1.1                  # -1.1 .. 1.1, the same every time
+        step = 0.24                                                 # cm driven between looks at 8 cm/s
+        wall = [[[None, 70 - i * step + wobble(i) / 4, 70 - i * step, 70 - i * step - wobble(i) / 4, None], step, 0]
+                for i in range(270)]
+        floor = [[[17 + wobble(i) / 2, 17 - wobble(i), 17 + wobble(i + 3), 17 + wobble(i + 9) / 2, 180], step, 0]
+                 for i in range(120)]
+        leg = [[[None, 200, 45 - i * step, 200, None], step, 0] for i in range(170)]
+        blips = [[list(r), 0, 0] for r in [(142, 115, 108, 101, 83)] * 30 + [(142, 115, 64.2, 13.5, 83)] * 3
+                 + [(142, 115, 108, 101, 83)] * 10 + [(140, 16.5, 58.9, 101, 83)] * 2 + [(142, 115, 108, 101, 83)] * 10]
+        ramp_up = [[[None, 23 + wobble(i) / 5, 23, 23 - wobble(i) / 5, None], step, 0] for i in range(60)]
+        turn = [[[None, 20, 20, 20, None], 0, 0]] * 12 + [[[None, 20, 17 + wobble(i) / 2, 17, None], 0, 3] for i in range(12)] \
+            + [[[None, 17, 17 + wobble(i) / 2, 17, None], step, 0] for i in range(20)]
+        looks = [("driving up to a wall", wall), ("open floor, driving", floor), ("a chair leg dead ahead", leg),
+                 ("far things, with the real sensor's blips", blips), ("a ramp: it shows closer, and comes no closer", ramp_up),
+                 ("turning away from a wall onto open floor", turn)]
+        zones = [("a wall driven up to, through where the floor shows", [[40 - i * step, step, 0] for i in range(150)]),
+                 ("the floor, standing still then driving", [[17 + wobble(i), step if i > 20 else 0, 0] for i in range(80)]),
+                 ("nothing, a blip, nothing", [[None, 0, 0]] * 3 + [[9, 0, 0]] * 2 + [[None, 0, 0]] * 3 + [[9, 0, 0]] * 6),
+                 ("a thing that jumps closer", [[26, step, 0]] * 8 + [[14, step, 0]] * 8 + [[26, step, 3]] * 8)]
+        ramps = [[0, 8, 0.9, 1.8], [7.5, 8, 0.9, 1.8], [8, 8, 0.9, 1.8], [8, 0, 0.9, 1.8], [1, 0, 0.9, 1.8], [8, -8, 0.9, 1.8],
+                 [-8, 8, 0.9, 1.8], [-0.5, 8, 0.9, 1.8], [8, 4, 0.9, 1.8], [-8, -3, 0.9, 1.8], [0, -8, 0.9, 1.8],
+                 [0, 90, 16.2, 16.2], [90, -90, 16.2, 16.2], [-10, 0, 16.2, 16.2]]
+        limits = [[d, speed] for speed in (8, 13) for d in (None, 0, 5, 11.99, 12, 12.5, 20, 29.9, 30, 100)]
+        return looks, zones, ramps, limits
+
+    def test_the_shared_examples_are_this_codes_answers(self):
+        import remote_control as rc
+        rnd = lambda v: None if v is None else round(v, 6)
+        looks, zones, ramps, limits = self.scenes()
+        now = {"note": "Examples for docs/bumper.js, with the answers of src/remote_control.py. Written by tests/test_robot.py.",
+               "numbers": {k: getattr(rc, k) for k in (
+                   "SPEED", "TURBO_SPEED", "TURN", "BUMPER_CM", "SLOW_CM", "FLOOR_CM", "FLOOR_SLACK_CM", "FLOOR_PROOF_CM",
+                   "CLOSER_CM", "VIEW_JUMP_CM", "VIEW_TURN_DEG", "SURE", "BUMPER_SMOOTH", "ACCEL", "DECEL", "TURN_ACCEL",
+                   "STICK_TIMEOUT_MS", "SLOW_FLASH_MS", "STOP_FLASH_MS", "TELEMETRY_MS", "COLORS")},
+               "dance": {k: getattr(__import__("dance"), k) for k in ("DISCO", "DANCE_MS", "BEAT_MS", "WIGGLE", "SPIN")},
+               "ramp": [r + [rnd(rc.ramp(*r))] for r in ramps],
+               "limit": [l + [rnd(rc.bumper_limit(*l))] for l in limits], "looks": [], "zones": []}
+        for note, steps in looks:
+            eyes = rc.Bumper()
+            now["looks"].append({"note": note, "steps": [[[rnd(d) for d in ds], m, t] for ds, m, t in steps],
+                                 "ahead": [rnd(eyes.look(*s)) for s in steps]})
+        for note, steps in zones:
+            zone = rc.Zone()
+            now["zones"].append({"note": note, "steps": [[rnd(d), m, t] for d, m, t in steps],
+                                 "seen": [rnd(zone.see(*s)) for s in steps]})
+        # the examples must show the interesting things, or they prove little
+        by = {scene["note"]: scene["ahead"] for scene in now["looks"]}
+        self.assertLess(by["driving up to a wall"][-1], rc.BUMPER_CM)
+        self.assertEqual(set(by["open floor, driving"]), {None})
+        self.assertGreater(rc.bumper_limit(by["a chair leg dead ahead"][-1], rc.SPEED), 0)
+        self.assertIsNone(by["a ramp: it shows closer, and comes no closer"][-1])
+        self.assertIsNone(by["turning away from a wall onto open floor"][-1])
+        if os.environ.get("WRITE_VECTORS"):
+            with open(self.PATH, "w") as f:
+                json.dump(now, f, separators=(",", ":"))
+                f.write("\n")
+        with open(self.PATH) as f:
+            self.assertEqual(json.load(f), json.loads(json.dumps(now)),
+                             "the driving sums changed: see this class's docstring")
 
 
 class Telemetry(RobotTest):

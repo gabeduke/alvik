@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1630">
+<title>🛡️ The bumper · Alvik lessons</title>
+<meta name="description" content="Lesson 6: From noisy readings to one decision: slow down, or stop.">
+<meta property="og:title" content="🛡️ The bumper · Alvik lessons">
+<meta property="og:description" content="Lesson 6: From noisy readings to one decision: slow down, or stop.">
+<meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+<header class="top">
+  <a class="home" href="./">📚 Alvik lessons</a>
+  <a class="chip" href="../?demo">🎮 Pretend robot</a>
+  <a class="chip" href="../">🤖 Remote</a>
+</header>
+
+<p class="kicker">Lesson 6 of 9 · about 25 minutes</p>
+<h1>🛡️ The bumper</h1>
+<p class="lead">The robot should stop before it drives into the wall. That sounds like one line of
+  code. It took us several tries. This lesson is about turning <b>noisy readings into a decision</b>.</p>
+
+<section class="need">
+  <h2>🧰 You need</h2>
+  <ul>
+    <li>The robot and remote, or the pretend robot.</li>
+    <li>A wall or a big box, a chair, and a clear bit of floor.</li>
+  </ul>
+  <a class="go real" href="../?show=cloud,heat">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=cloud,heat">🎮 Pretend robot</a>
+</section>
+
+<section>
+  <h2>▶️ Do it</h2>
+  <ol class="steps">
+    <li>Check that <b>🛡️ Bumper</b> says "on". Drive straight at a wall from a metre away and keep the joystick pushed.</li>
+    <li>About 30 cm from the wall the robot starts to slow down, and its lights blink red slowly. On the screen, a sheet of <b>heat</b> appears in front of the 3D robot: yellow, then orange.</li>
+    <li>At 12 cm it stops. The lights flash red fast and the heat turns red. The <b>🧱</b> number is what the robot thinks is in front of it.</li>
+    <li>Pull the joystick back. Reversing always works: the bumper only cares about what is ahead.</li>
+    <li>Now drive at a chair leg. It slows down less than it did for the wall, and gets much closer. The real robot bumps into it. (The pretend one stops about 4 cm away.) Hmm.</li>
+    <li>Turn the bumper off and drive at the wall again (gently). Nothing saves you now.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>🔍 How it works</h2>
+  <p>The dots from lesson 5 are what the sensor <i>reads</i>. The heat is what the robot has
+    <i>decided</i>. Getting from one to the other is the hard part.</p>
+
+  <h3>First idea: stop for the closest reading</h3>
+  <pre><code>if min(alvik.get_distance()) &lt; 12:
+    stop()</code></pre>
+  <p>You know from lesson 5 why this fails. The floor reads 17 cm, so a robot that slows down for
+    anything under 30 cm crawls across an empty room, blinking red at nothing. And every blip is a
+    jolt.</p>
+
+  <h3>Second idea: ignore the floor's distance</h3>
+  <p>Throw away anything near 17 cm? Then a real wall goes invisible for a moment as the robot
+    drives up to it, right when it matters.</p>
+
+  <h3>What it does now</h3>
+  <p>The robot looks at each of the middle three zones on its own and asks three questions.</p>
+  <ol>
+    <li><b>Is it a blip?</b> A thing has to show up four readings in a row before it counts.</li>
+    <li><b>Is it the floor?</b> A reading near where the floor shows only counts if the robot has
+      watched it <i>come closer while driving at it</i>. A wall comes closer. The floor doesn't: it
+      stays 17 cm ahead however far you drive.</li>
+    <li><b>Has it stopped coming closer?</b> If the robot drives 4 cm at a "thing" and it comes no
+      closer, it was floor after all (a ramp, or a thick carpet), and the robot remembers that this
+      is where the floor shows now.</li>
+  </ol>
+  <p>Then it takes the <b>average</b> of the three zones, not the closest, counting a clear zone as
+    30 cm. And it <b>smooths</b> that: each time round the loop it moves only part of the way to the new answer.</p>
+  <pre><code>total = 0
+for zone, d in zip(self.zones, distances[1:4]):
+    d = zone.see(d, moved, turned)
+    total += SLOW_CM if d is None or d &gt; SLOW_CM else d
+self.ahead += (total / 3 - self.ahead) * BUMPER_SMOOTH</code></pre>
+  <p>Last, that one distance sets a speed limit: full speed beyond 30 cm, slower and slower down to
+    12 cm, and zero inside 12 cm.</p>
+
+  <h3>Closest, or average?</h3>
+  <div class="play">
+    <label>Half left zone <input type="range" id="z0" min="4" max="60" value="60"><output id="z0v"></output></label>
+    <label>Middle zone <input type="range" id="z1" min="4" max="60" value="60"><output id="z1v"></output></label>
+    <label>Half right zone <input type="range" id="z2" min="4" max="60" value="60"><output id="z2v"></output></label>
+    <p class="verdict" id="closest"></p>
+    <p class="verdict" id="average"></p>
+  </div>
+  <p>Set all three to 20: a wall. Both rules agree. Now set just the middle one to 6 and leave the
+    others at 60: a chair leg. The closest rule stops. The average rule only slows down, and the
+    robot carries on towards the leg.</p>
+  <p>So why use the average? Because the closest rule also stops for every blip and every wobble,
+    and a robot that stops for nothing is no fun to drive. We chose smooth driving and a gentle bump
+    now and then. That is a <b>trade-off</b>, and engineers make them all the time. You might choose differently.</p>
+</section>
+
+<section class="try">
+  <h2>🧪 Try this</h2>
+  <ul>
+    <li><b>Measure it.</b> Drive at a wall and let the bumper stop the robot. Measure from its nose to the wall with a ruler. Is it 12 cm? Do it five times. Is it the same each time?</li>
+    <li><b>Come in at an angle.</b> Drive at the wall slanting, not straight on. Does it still stop in time? Which zones see the wall first?</li>
+    <li><b>Dots against heat.</b> On open floor, look at the dots (17 cm, the floor) and at the heat (nothing). That gap is this whole lesson.</li>
+    <li><b>Invent a rule.</b> What about "the closest of the three, but only if it stays there for four readings"? Use the sliders to think it through. What would it do at the chair leg? On a ramp?</li>
+  </ul>
+</section>
+
+<section class="change">
+  <h2>✏️ Change it</h2>
+  <p>In <a href="https://github.com/gabeduke/alvik/blob/main/src/remote_control.py"><code>remote_control.py</code></a>,
+    <code>SLOW_CM = 30</code> and <code>BUMPER_CM = 12</code> set where it slows and where it stops.
+    For a faster robot you might want to start slowing down sooner. The whole of the bumper is
+    two small classes there, <code>Zone</code> and <code>Bumper</code>, with a comment on every rule.
+    Lesson 3 says how to change a file on the robot.</p>
+</section>
+
+<script type="module">
+import { bumperLimit, SLOW_CM, SPEED } from "../bumper.js";   // the robot's own speed limit, in JavaScript
+const $ = (id) => document.getElementById(id);
+const say = (d) => {
+  const limit = bumperLimit(d >= SLOW_CM ? null : d, SPEED);
+  if (limit === 0) return `<b class="stop">stop</b>`;
+  if (limit < SPEED) return `<b class="slow">slow down to ${limit.toFixed(1)} cm/s</b>`;
+  return `<b class="clear">full speed, ${SPEED} cm/s</b>`;
+};
+function work() {
+  const z = [0, 1, 2].map((i) => Number($("z" + i).value));
+  z.forEach((v, i) => { $("z" + i + "v").textContent = v + " cm"; });
+  const closest = Math.min(...z);
+  const average = z.reduce((sum, v) => sum + Math.min(v, SLOW_CM), 0) / 3;
+  $("closest").innerHTML = `Closest: ${closest} cm → ${say(closest)}`;
+  // (the robot calls anything from 29 cm out "all clear", so its smoothed number can't flicker at 30)
+  $("average").innerHTML = `Average (clear counts as ${SLOW_CM}): ${average.toFixed(1)} cm → ${say(average < SLOW_CM - 1 ? average : SLOW_CM)}`;
+}
+[0, 1, 2].forEach((i) => $("z" + i).addEventListener("input", work));
+work();
+</script>
+
+<nav class="next">
+  <a href="5-seeing.html"><small>← Lesson 5</small>👀 Seeing ahead</a>
+  <a class="fwd" href="7-underneath.html"><small>Lesson 7 →</small>🌈 Underneath</a>
+</nav>
+
+<footer>Lessons for the <a href="../">Alvik remote</a>. The code is on <a href="https://github.com/gabeduke/alvik">GitHub</a>.
+  Found a mistake? <a href="https://github.com/gabeduke/alvik/issues">Tell us</a>. Not made by or connected with Arduino.</footer>
+</body>
+</html>

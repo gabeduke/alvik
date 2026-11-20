@@ -70,7 +70,7 @@ test("loadSketchList reads the published list", async () => {
   assert.deepEqual(list.map((s) => s.name), sketchNames());
 });
 
-for (const name of ["disco", "follow_me"]) {
+for (const name of ["disco", "follow_me", "scaredy_cat"]) {
   test(`flashing the ${name} sketch puts it in /sketches/${name}/ with the core files`, async () => {
     const files = await loadSketchFiles(site, name, siteFetch);
     const board = new FakeBoard();

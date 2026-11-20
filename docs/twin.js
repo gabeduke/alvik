@@ -11,6 +11,7 @@
 //   twin.under(u);                              // u = a parsed under-the-robot packet (lines, floor colour, height)
 //   twin.reset();                               // robot went away: stand still, lights off
 //   twin.recentre();                            // "the robot is pointing away from me right now"
+//   twin.show({ cloud: false, heat: false });   // leave some sensors out (the lessons add them one at a time)
 //
 // The model (models/build_alvik_web.py) is in metres, faces +Z, left = +X, with parts named
 // Body, Baseplate, WheelL, WheelR, LedL, LedR, Tof. The camera sits behind and above it, so a robot
@@ -190,6 +191,9 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
   const groundNow = [0, 0, 0];
   let lines = [null, null, null];               // line sensors, left to right: raw readings
   let newsAt = 0, lastFrame = 0, frame = 0, small = false;
+  // which sensors are drawn: the cloud of raw readings, the bumper's heat, and everything that
+  // looks down or feels the robot move (floor colour, line sensors, picked up, tipped)
+  const on = { cloud: true, heat: true, under: true };
   const pos = new THREE.Vector2();              // how far the floor has slid (x, z), metres
   const tint = new THREE.Color();
 
@@ -349,19 +353,21 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     /** s = parsed sensors packet (telemetry.js): five raw distances, tilt. */
     sensors(s) {
       const now = performance.now();
-      s.zones.forEach((cm, i) => cloudAdd(cloud, i + (Math.random() - 0.5) * 0.7, ROW_FRONT, cm, now, (Math.random() - 0.5) * 0.01));
+      if (on.cloud) s.zones.forEach((cm, i) => cloudAdd(cloud, i + (Math.random() - 0.5) * 0.7, ROW_FRONT, cm, now, (Math.random() - 0.5) * 0.01));
       // small leans are just the floor and the sensor's noise
-      roll = Math.abs(s.roll) < 4 ? 0 : Math.max(-60, Math.min(60, s.roll));
-      pitch = Math.abs(s.pitch) < 4 ? 0 : Math.max(-60, Math.min(60, s.pitch));
+      roll = !on.under || Math.abs(s.roll) < 4 ? 0 : Math.max(-60, Math.min(60, s.roll));
+      pitch = !on.under || Math.abs(s.pitch) < 4 ? 0 : Math.max(-60, Math.min(60, s.pitch));
       wake();
     },
     /** u = parsed under-the-robot packet (telemetry.js): line sensors, the floor's colour, how far down the floor is. */
     under(u) {
-      lines = u.lines; ground = u.floor; lift = liftOf(u.bottom);
+      if (on.under) { lines = u.lines; ground = u.floor; lift = liftOf(u.bottom); }
       // the sensor's low and high rows, each one reading for the whole width
       const now = performance.now();
-      cloudAdd(cloud, 2 + (Math.random() - 0.5) * 1.6, ROW_BOTTOM, u.bottom, now);
-      cloudAdd(cloud, 2 + (Math.random() - 0.5) * 2.4, ROW_TOP, u.top, now, (Math.random() - 0.5) * 0.008);
+      if (on.cloud) {
+        cloudAdd(cloud, 2 + (Math.random() - 0.5) * 1.6, ROW_BOTTOM, u.bottom, now);
+        cloudAdd(cloud, 2 + (Math.random() - 0.5) * 2.4, ROW_TOP, u.top, now, (Math.random() - 0.5) * 0.008);
+      }
       wake();
     },
     /** Call the way the robot points right now "away from me". */
@@ -369,6 +375,15 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       if (zero === null) return;
       zero = latest;
       head.target = head.shown = 0;
+      wake();
+    },
+    /** Draw only some of the sensors: { cloud, heat, under }, each true or false (left out = as it was). */
+    show(layers) {
+      for (const k of Object.keys(on)) if (k in layers) on[k] = !!layers[k];
+      heatMesh.visible = on.heat;
+      cloudMesh.visible = on.cloud;
+      if (!on.cloud) { cloud.points.length = 0; cloud.next = 0; }
+      if (!on.under) { lines = [null, null, null]; ground = null; lift = 0; roll = pitch = 0; }
       wake();
     },
     resize: place,

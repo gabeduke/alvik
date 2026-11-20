@@ -1,0 +1,8 @@
+{
+  "title": "Scaredy cat",
+  "emoji": "🙀",
+  "description": "Sits still until something comes close, then backs away from it.",
+  "color": [0, 1, 1],
+  "hardware": ["distance sensors", "wheels", "lights"],
+  "entry": "scaredy_cat"
+}
