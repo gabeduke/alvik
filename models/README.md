@@ -9,6 +9,7 @@ Source files for the 3D Alvik on the web remote (issue #6). Units in the STL/STE
 | `alvik_reference.blend` | Blender scene with both imported (collection `AlvikReference`, scaled to metres, plate placed on top), for looking at them | this repo | as above |
 | `build_alvik_web.py` | Blender script that builds `docs/models/alvik.glb` from the two STLs | this repo | |
 | `build_grove_holders.py`, `grove/*.stl` | Printable trays that hold Grove boards and press onto the plate's studs. See `grove/README.md` | this repo | MIT |
+| `build_addons.py`, `addons/*.stl` | More printable parts for the plate: pen holder, corner with studs on a wall, cable clip, Modulino tray, and a test stand. See `addons/README.md` | this repo | MIT |
 | `../docs/models/alvik.glb` | The model the web remote shows. Built, not edited by hand. | `build_alvik_web.py` | CC BY-NC-SA (it contains the baseplate); the credit is in the file's `asset.copyright` and on the page |
 
 ## Building the web model

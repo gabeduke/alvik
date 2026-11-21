@@ -1,0 +1,8 @@
+{
+  "title": "Doodle",
+  "emoji": "✏️",
+  "description": "Draws a square, a triangle, a star or a ring with a felt pen. Needs the printed pen holder.",
+  "color": [1, 1, 0],
+  "hardware": ["wheels", "lights", "printed pen holder", "felt pen"],
+  "entry": "doodle"
+}

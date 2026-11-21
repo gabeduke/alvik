@@ -9,6 +9,7 @@ real robot, so the menu stops the way it does when the flash page interrupts it.
 """
 import io
 import json
+import math
 import os
 import shutil
 import sys
@@ -174,7 +175,7 @@ class RobotTest(unittest.TestCase):
         self.sketch_dir = os.path.join(self.root, "sketches")
         self._path = list(sys.path)
         sys.path.insert(0, self.root)
-        for m in ROBOT_MODULES + ["disco", "follow_me", "scaredy_cat", "boom", "ghost"] + ["s%d" % i for i in range(20)]:
+        for m in ROBOT_MODULES + ["disco", "doodle", "follow_me", "scaredy_cat", "boom", "ghost"] + ["s%d" % i for i in range(20)]:
             sys.modules.pop(m, None)
         CLOCK.now = 0
         CLOCK.end = None
@@ -380,6 +381,97 @@ class Sketches(RobotTest):
         self.assertEqual({(l, a) for t, l, a in robot.drives if 6100 < t < 8000}, {(-8, 0)})
         self.assertEqual(robot.colour_at(7900), (RED, RED), "red while backing away")
         self.assertEqual(robot.colour_at(9000), ((0, 1, 0), (0, 1, 0)), "calm again")
+
+    # ----- doodle: the robot draws with a pen held beside its right wheel -----
+    PEN_CM = 5.7
+
+    @staticmethod
+    def pen_path(robot, t0, t1, pen_cm, step=5):
+        """Where the pen's tip goes (cm) between t0 and t1, worked out from the speeds the robot was told."""
+        x = y = heading = 0.0
+        path, i, linear, angular = [], 0, 0, 0
+        for t in range(0, t1, step):
+            while i < len(robot.drives) and robot.drives[i][0] <= t:
+                linear, angular = robot.drives[i][1:]
+                i += 1
+            heading += math.radians(angular) * step / 1000
+            x += linear * math.cos(heading) * step / 1000
+            y += linear * math.sin(heading) * step / 1000
+            if t >= t0:
+                path.append((x + pen_cm * math.sin(heading), y - pen_cm * math.cos(heading)))
+        return path
+
+    @staticmethod
+    def odometry(a):
+        """The pretend robot knows which way it points, as the real one does: -180..180, left counts up."""
+        def heading(t):
+            deg, was, angular = 0.0, 0, 0
+            for when, _, turn in a.drives:
+                if when > t:
+                    break
+                deg += angular * (when - was) / 1000
+                was, angular = when, turn
+            return (deg + angular * (t - was) / 1000 + 180) % 360 - 180
+        a.heading = heading
+
+    def doodle(self, script):
+        self.install("doodle")
+        return self.boot(script, setup=self.odometry)[0]
+
+    def test_doodle_square_has_sharp_corners_and_closes(self):
+        s = Script().press("up").press("up").press("up")      # -> doodle, the only sketch
+        s.press("ok", hold=1500)      # a long press on the menu's ✓ must not start a drawing
+        go = s.t
+        s.press("ok").wait(20000)
+        end = s.t
+        s.press("cancel")
+        robot = self.doodle(s)
+        self.assertEqual([d for d in robot.drives if d[0] < go and d[1:] != (0, 0)], [], "waits for its own ✓")
+        self.assertEqual(robot.colour_at(go - 100), ((0, 1, 0), (0, 1, 0)), "green = square")
+        moves = [(l, a) for t, l, a in robot.drives if t >= go and (l, a) != (0, 0)]
+        self.assertEqual(len(moves), 8, moves)
+        self.assertEqual(moves[0::2], [(6, 0)] * 4, "four lines")
+        for l, a in moves[1::2]:
+            self.assertEqual(a, -45)
+            self.assertAlmostEqual(l, math.radians(45) * self.PEN_CM, places=3)
+        path = self.pen_path(robot, go, end, self.PEN_CM)
+        xs, ys = [p[0] for p in path], [p[1] for p in path]
+        self.assertAlmostEqual(max(xs) - min(xs), 12, delta=0.4)
+        self.assertAlmostEqual(max(ys) - min(ys), 12, delta=0.4)
+        self.assertLess(math.dist(path[0], path[-1]), 0.5, "the pen ends where it began")
+        self.assertEqual(robot.drives[-1][1:], (0, 0), "stopped")
+
+    def test_doodle_picks_shapes_with_left_and_right(self):
+        s = Script().press("up").press("up").press("up").press("ok")
+        s.press("right").press("right")                        # square -> triangle -> star
+        star = s.t - 100
+        s.press("ok").wait(32000)
+        s.press("left").press("left").press("left")            # star -> triangle -> square -> ring
+        ring = s.t - 100
+        s.press("ok").wait(9000)
+        end = s.t
+        s.press("cancel")
+        robot = self.doodle(s)
+        self.assertEqual(robot.colour_at(star), (PURPLE, PURPLE))
+        self.assertEqual(robot.colour_at(ring), (BLUE, BLUE))
+        corners = [t for t, l, a in robot.drives if star < t < ring and a == -45]
+        self.assertEqual(len(corners), 5, "a star has five points")
+        spins = [(l, a) for t, l, a in robot.drives if t > ring and (l, a) != (0, 0)]
+        self.assertEqual(spins, [(0, -45)], "the ring is one spin on the spot")
+        path = self.pen_path(robot, ring, end, self.PEN_CM)
+        xs = [p[0] for p in path]
+        self.assertAlmostEqual(max(xs) - min(xs), 2 * self.PEN_CM, delta=0.3)
+
+    def test_doodle_cancel_stops_in_the_middle_of_a_drawing(self):
+        s = Script().press("up").press("up").press("up").press("ok").press("ok").wait(3000)
+        s.press("cancel")
+        back = s.t
+        s.wait(1000).press("down")
+        down = s.t - 100
+        robot = self.doodle(s)
+        self.assertEqual([d[1:] for d in robot.drives if d[0] > back and d[1:] != (0, 0)], [], "nothing after ✗")
+        self.assertEqual(robot.colour_at(back + 900)[0], YELLOW, "back on the doodle menu entry")
+        self.assertEqual(robot.colour_at(down)[0], PURPLE)
 
     def test_crashing_and_missing_sketches_flash_red_and_return(self):
         self.install("boom", {"title": "Boom", "emoji": "x", "description": "d", "color": [0, 1, 1], "entry": "boom"},

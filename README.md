@@ -77,6 +77,7 @@ A lesson's link to the remote can leave sensors off the 3D robot, so they arrive
   - `line_follower.py`, `hand_follower.py`, `touch_move.py` – stock Arduino demos
 - `sketches/<name>/` – extra programs for the menu (see [Sketches](#sketches))
 - `models/` – where the 3D robot comes from: reference files, credits and the Blender script that builds `docs/models/alvik.glb`
+  - `models/grove/`, `models/addons/` – parts to print for the robot's LEGO plate: trays for Grove and Modulino boards, a pen holder, a corner, a cable clip, a test stand
 - `scripts/build_site.sh` – builds the Pages site into `_site/`; `tests/` – tests for both sides
 - `stock-backup/` – a copy of whatever was on your robot before you changed it (not kept in git)
 
@@ -163,6 +164,7 @@ A sketch is a small program that shows up as an extra colour in the robot's menu
 | | Sketch | Uses |
 |---|---|---|
 | 🪩 | [`disco`](sketches/disco/) – party lights, wiggle, big spin. ✓ dances again | wheels, lights |
+| ✏️ | [`doodle`](sketches/doodle/) – draws a square, a triangle, a star or a ring with a felt pen (not run on a real robot yet) | wheels, lights, the printed [pen holder](models/addons/) |
 | 🐕 | [`follow_me`](sketches/follow_me/) – follows your hand like a puppy | distance sensors, wheels, lights |
 | 🙀 | [`scaredy_cat`](sketches/scaredy_cat/) – backs away when something comes close ([lesson 8](https://gabeduke.github.io/alvik/learn/8-sketch.html) writes it) | distance sensors, wheels, lights |
 
