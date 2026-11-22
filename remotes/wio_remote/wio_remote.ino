@@ -90,10 +90,15 @@ static void send(const uint8_t* p, size_t n) {
 }
 
 // ---------- connecting ----------
+static void dbg(const char* fmt, ...);
 static bool findRobot() {
   BLEScan* scan = BLEDevice::getScan();
   scan->setActiveScan(true);
+  dbg("scanning");
   BLEScanResults found = scan->start(2, false);
+  int named = -1;
+  for (int i = 0; i < found.getCount(); i++) if (found.getDevice(i).getName() == ROBOT_NAME) named = i;
+  dbg("scan: %d devices, Alvik %s", found.getCount(), named >= 0 ? "seen" : "not seen");
   for (int i = 0; i < found.getCount(); i++) {
     BLEAdvertisedDevice d = found.getDevice(i);
     if (d.getName() == ROBOT_NAME || d.isAdvertisingService(NUS)) {
@@ -105,34 +110,62 @@ static bool findRobot() {
         client->setClientCallbacks(new Link());
         static BLEAdvertisedDevice first;              // the first connect sets the client up
         first = d;
-        return client->connect(&first);
+        dbg("connecting (first)");
+        bool ok = client->connect(&first);
+        dbg("connect: %s", ok ? "ok" : "failed");
+        return ok;
       }
-      return client->connect(*robotAddr, robotAddrType);
+      dbg("connecting");
+      bool ok = client->connect(*robotAddr, robotAddrType);
+      dbg("connect: %s", ok ? "ok" : "failed");
+      return ok;
     }
   }
   return false;
 }
 
+// Which Nordic UART part a UUID is: 1 service, 2 RX, 3 TX, 0 none. Seeed's rpcBLE (1.0.0) builds
+// discovered 128-bit UUIDs so that toString() says "<NULL>" (and a lookup by UUID never matches),
+// so look at the raw bytes, either way round. 6E40000x-B5A3-F393-E0A9-E50E24DCCA9E.
+static int nusPart(BLEUUID u) {
+  if (u.length() != 16) return 0;
+  const uint8_t* b = u.dataNative();
+  if (b[15] == 0x6E && b[14] == 0x40 && b[13] == 0x00 && b[0] == 0x9E) return b[12];   // LSB first
+  if (b[0] == 0x6E && b[1] == 0x40 && b[2] == 0x00 && b[15] == 0x9E) return b[3];      // MSB first
+  return 0;
+}
+
 static bool hookUp() {
-  client->getServices();                     // fresh look every time: handles can change
-  BLERemoteService* uart = client->getService(NUS);
+  // Read the service list once per connection and never again. rpcBLE frees the old list while its
+  // Bluetooth task may still be walking it, and it deletes each characteristic twice when it
+  // rebuilds them (both found on a real Wio: "ASSERT: vPortFree").
+  dbg("reading services");
+  auto* services = client->getServices();
+  delay(100);                                // let the Bluetooth task finish with the list
+  BLERemoteService* uart = nullptr;
+  for (auto& s : *services) {
+    int part = nusPart(s.second->getUUID());
+    dbg("service %d bytes, nus %d", s.second->getUUID().length(), part);
+    if (part == 1) uart = s.second;
+  }
   BLERemoteCharacteristic* tx = nullptr;
   rx = nullptr;
   if (uart) {
-    rx = uart->getCharacteristic(NUS_RX);
-    tx = uart->getCharacteristic(NUS_TX);
-  }
-  if (!rx || !tx) {                          // the 128-bit lookup failed: go by what each one can do
-    auto* services = client->getServices();
-    for (auto& s : *services) {
-      auto* chars = s.second->getCharacteristics();
-      for (auto& c : *chars) {
-        if (!tx && c.second->canNotify()) tx = c.second;
-        if (!rx && (c.second->canWriteNoResponse() || c.second->canWrite())) rx = c.second;
-      }
+    // by handle: the by-name list keys every 128-bit one "<NULL>", so they overwrite each other.
+    // Read once: asking again would free them twice.
+    auto* chars = uart->getCharacteristicsByHandle();
+    for (auto& c : *chars) {
+      int part = nusPart(c.second->getUUID());
+      if (part == 2) rx = c.second;
+      if (part == 3) tx = c.second;
+    }
+    for (auto& c : *chars) {                 // by UUID failed: go by what each one can do
+      if (!tx && c.second->canNotify()) tx = c.second;
+      if (!rx && (c.second->canWriteNoResponse() || c.second->canWrite())) rx = c.second;
     }
   }
-  if (!rx || !tx) return false;
+  dbg("hook up: uart %d rx %d tx %d", uart != nullptr, rx != nullptr, tx != nullptr);
+  if (!rx || !tx) { client->disconnect(); return false; }   // let the robot advertise again
   tx->registerForNotify(onNotify);
   linkUp = true;
   uint8_t p[5];
@@ -219,6 +252,23 @@ static void drawWaiting() {
   const char* steps[] = {"1. Robot on, up arrow until PURPLE, then tick", "2. Robot lights go YELLOW = ready",
                          "3. Phone or web remote disconnected", "   (only one remote at a time)"};
   for (int i = 0; i < 4; i++) tft.drawString(steps[i], 12, 90 + i * 26, 2);
+}
+
+// first-run diagnostics: each step goes to USB serial and to the bottom of the waiting screen,
+// so a freeze shows where it happened even if USB stops answering
+static int dbgLine = 0;
+static void dbg(const char* fmt, ...) {
+  char line[64];
+  va_list ap; va_start(ap, fmt); vsnprintf(line, sizeof line, fmt, ap); va_end(ap);
+  Serial.printf("[%lu] %s\n", millis(), line);
+  if (linkUp) return;
+  int y = 180 + (dbgLine % 4) * 15;
+  dbgLine++;
+  tft.fillRect(0, y, 320, 15, TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  char shown[72]; snprintf(shown, sizeof shown, "%d %s", dbgLine, line);
+  tft.drawString(shown, 4, y, 2);
 }
 
 static void drawRadar() {
@@ -340,7 +390,12 @@ void setup() {
   lis.setOutputDataRate(LIS3DHTR_DATARATE_50HZ);
   lis.setFullScaleRange(LIS3DHTR_RANGE_2G);
   drawWaiting();
+  waitingShown = true;
+  while (!Serial && millis() < 8000) delay(10);   // give a serial monitor a moment to attach
+  dbg("before Bluetooth start");
   BLEDevice::init("");
+  dbg("Bluetooth started");
+  dbg("wireless firmware: %s", rpc_system_version());
 }
 
 void loop() {
