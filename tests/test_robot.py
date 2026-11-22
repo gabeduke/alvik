@@ -979,5 +979,57 @@ class Telemetry(RobotTest):
         self.assertLessEqual(max(when for when, p in rc._link.sent), 1000)
 
 
+class WioPackets(RobotTest):
+    """The Wio Terminal remote (remotes/wio_remote) speaks the same packets as the web remote: what it
+    builds goes through the robot's own parse_packets, and what it reads matches telemetry_vectors.json.
+    Needs a C++ compiler (g++ or c++); skipped without one."""
+
+    def setUp(self):
+        cxx = shutil.which("g++") or shutil.which("c++")
+        if not cxx:
+            self.skipTest("no C++ compiler")
+        super().setUp()                         # puts the robot's src/ on the path, for parse_packets
+        import subprocess
+        self.tmp = tempfile.mkdtemp()
+        exe = os.path.join(self.tmp, "harness")
+        subprocess.run([cxx, "-std=c++11", "-o", exe,
+                        os.path.join(REPO, "tests", "wio_packets_harness.cpp")], check=True)
+        with open(os.path.join(REPO, "tests", "telemetry_vectors.json")) as f:
+            self.vectors = json.load(f)
+        run = subprocess.run([exe], input="\n".join(v["hex"] for v in self.vectors) + "\n",
+                             capture_output=True, text=True, check=True)
+        self.lines = run.stdout.split("\n")
+
+    def tearDown(self):
+        shutil.rmtree(getattr(self, "tmp", ""), ignore_errors=True)
+        super().tearDown()
+
+    def test_what_it_reads_matches_the_page(self):
+        read = [l for l in self.lines if l[:2] in ("T ", "S ", "U ")]
+        self.assertEqual(len(read), len(self.vectors), "every example packet is read once, junk and pieces or not")
+        none = lambda v: -1 if v is None else v
+        for line, v in zip(read, self.vectors):
+            p, f = v["page"], line.split()
+            if f[0] == "T":
+                want = ["%.1f" % p["heading"], str(none(p["distance"])), "".join(map(str, p["left"])),
+                        "".join(map(str, p["right"])), "%.1f" % p["speed"], str(p["turn"])] + \
+                       [str(int(p[k])) for k in ("turbo", "bumper", "blocked", "dancing")]
+            elif f[0] == "S":
+                want = [str(none(z)) for z in p["zones"]] + [str(p["roll"]), str(p["pitch"]), str(none(p["battery"]))]
+            else:
+                floor = p["floor"] or [None] * 3
+                want = [str(none(x)) for x in p["lines"]] + \
+                       [str(-1 if x is None else int(round(x * 100))) for x in floor] + [str(none(p["bottom"])), str(none(p["top"]))]
+            self.assertEqual(f[1:], want, v["note"])
+
+    def test_what_it_sends_the_robot_understands(self):
+        import remote_control as rc
+        out = b"".join(bytes.fromhex(l[4:]) for l in self.lines if l.startswith("OUT "))
+        ev = []
+        self.assertEqual(rc.parse_packets(out, ev), b"")
+        self.assertEqual(ev, [("J", 0, 100), ("J", -100, 0), ("J", 50, -100), ("J", 100, -100), ("J", 0, 0),
+                              (1, True), (1, False), (2, True), (2, False), (3, True), (3, False), (4, True), (4, False),
+                              ("T", True)])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
