@@ -85,8 +85,14 @@ static bool dirty = true;
 static int zoneHist[5][3];                   // the last three raw readings per zone, newest first
 static const int RW = 200, RH = 214, PW = 120;   // radar and side panel sizes (8-bit sprites: about 66 KB together)
 
+// Write without response, like the web page. Not rx->writeValue(): rpcBLE 1.0.0 always writes
+// with response and waits for the answer, whatever you ask for.
+static void write(const uint8_t* p, size_t n) {
+  if (client && rx) client_attr_write(client->getConnId(), client->getGattcIf(), GATT_WRITE_TYPE_CMD,
+                                      rx->getHandle(), n, (uint8_t*)p);
+}
 static void send(const uint8_t* p, size_t n) {
-  if (linkUp && rx) rx->writeValue((uint8_t*)p, n, false);   // write without response, like the web page
+  if (linkUp) write(p, n);
 }
 
 // ---------- connecting ----------
@@ -166,11 +172,16 @@ static bool hookUp() {
   }
   dbg("hook up: uart %d rx %d tx %d", uart != nullptr, rx != nullptr, tx != nullptr);
   if (!rx || !tx) { client->disconnect(); return false; }   // let the robot advertise again
-  tx->registerForNotify(onNotify);
-  linkUp = true;
+  // Ask for telemetry first: rpcBLE's registerForNotify() waits, with no time limit, until the first
+  // notification arrives, and the robot only sends once asked (it notifies without checking the
+  // subscription). Asked the other way round, the Wio hung here for ever.
   uint8_t p[5];
-  alvik::joystickPacket(p, 0, 0); send(p, 5);          // start from standing still
-  alvik::telemetryRequest(p, true); send(p, 5);
+  alvik::joystickPacket(p, 0, 0); write(p, 5);         // start from standing still
+  alvik::telemetryRequest(p, true); write(p, 5);
+  dbg("asked for telemetry, subscribing");
+  tx->registerForNotify(onNotify);
+  dbg("subscribed");
+  linkUp = true;
   askedAt = millis();
   sentX = sentY = 0;
   return true;
