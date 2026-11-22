@@ -32,7 +32,7 @@ Bluetooth to drive and Web Serial to put the code on. Not made by or connected w
 - **A bumper** that slows the robot down near things and stops it 8 cm short, without being fooled by the floor or a shiny table.
 - **A pretend robot** in a pretend room, running the same sums and speaking the same packets, for trying it all with no robot.
 - **An update page** that copies the code onto the robot from the browser, and a library of extra programs ("sketches") to add to the robot's colour menu.
-- **A Wio Terminal remote** (`remotes/wio_remote/`): a handheld with a stick, three buttons and a little radar screen, for driving without a phone. Not yet tried on a real Wio.
+- **A Wio Terminal remote** (`remotes/wio_remote/`): a handheld with a stick, three buttons and a little radar screen, for driving without a phone.
 - **Lessons** for a grown-up and a child to do together.
 
 ## Quick start

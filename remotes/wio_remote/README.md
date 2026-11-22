@@ -5,10 +5,9 @@ three buttons on top for lights, turbo and dance, and watch a little radar of wh
 It talks to the robot's purple "phone remote" mode over Bluetooth LE with the same packets as the web
 remote (`alvik_packets.h`), so the robot needs no new code.
 
-**Not yet run on a real Wio Terminal.** The packets are tested (`python3 tests/test_robot.py WioPackets`
-checks them against the robot's own parser and `tests/telemetry_vectors.json`), and the sketch was
-checked against Seeed's Bluetooth library source, but it has not been compiled with the Wio's board
-package or tried on the hardware yet. "First run" below lists what to look at.
+**It has driven a real Alvik** (Wio wireless firmware 2.1.3, Seeeduino:samd 1.8.5, rpcBLE 1.0.0).
+The packets are tested too (`python3 tests/test_robot.py WioPackets` checks them against the robot's
+own parser and `tests/telemetry_vectors.json`). Not checked yet: the rest of "First run" below.
 
 ## Controls
 
@@ -57,8 +56,8 @@ If the robot goes away, the Wio looks for it again. If Bluetooth gets stuck, it 
 
 ## First run: what to check
 
-- **It connects.** If "Looking for Alvik..." stays up while the robot is yellow, the Bluetooth
-  firmware (step 1) is the first suspect.
+- **It connects.** While it looks, numbered steps show at the bottom of the screen (and on USB serial
+  at 115200). The last one says where it got stuck. A good start ends "subscribed".
 - **The top buttons are in the right order.** If they aren't, swap the pins in `TOP_PINS`.
 - **The tilt bar leans the way you tip the Wio.** If not, flip `TILT_SIGN` or change `TILT_AXIS` to
   `getAccelerationX`.
@@ -66,6 +65,23 @@ If the robot goes away, the Wio looks for it again. If Bluetooth gets stuck, it 
   by itself 600 ms after the Wio goes quiet.
 - **Reconnecting** after the robot is switched off and on again: this is the least certain part.
   If it never comes back, press the Wio's reset.
+
+## Seeed's Bluetooth library: what to know
+
+rpcBLE 1.0.0 has bugs the sketch works around (each one found on the real Wio). Keep these in mind
+before changing `hookUp()`:
+
+- Discovered 128-bit UUIDs print as `<NULL>`, so looking a service or characteristic up by UUID never
+  finds it. The sketch matches the raw bytes (`nusPart()`) and lists characteristics by handle.
+- Asking for the service list a second time, or rebuilding characteristics, frees memory twice and
+  freezes the Wio (`ASSERT: vPortFree`, and USB stops answering). Read them once per connection.
+- `registerForNotify()` waits for the first notification with no time limit, so ask the robot for
+  telemetry first.
+- `writeValue()` always waits for a reply. Packets go out as write commands via `client_attr_write`.
+- Include `rpcBLEDevice.h` before `TFT_eSPI.h`, or it doesn't compile (`min`/`max` macros).
+
+Flashing over USB can stop working while the Wio is frozen: slide the power switch down twice quickly
+for the bootloader, then upload.
 
 ## Files
 
