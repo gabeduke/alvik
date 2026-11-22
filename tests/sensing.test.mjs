@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM, SLOW_CM, STOP_CM,
-  newCloud, cloudAdd, cloudAlpha, CLOUD_MS, ROW_FRONT } from "../docs/sensing.js";
+  newCloud, cloudAdd, cloudAlpha, CLOUD_MS, ROW_FRONT, newPose, poseTilt, poseLift, poseReset, median, STEADY, TILT_ON } from "../docs/sensing.js";
 
 /** The heat once it has settled on these readings. */
 function settled(zones) {
@@ -126,6 +126,75 @@ test("picked up: the further the floor, the higher the robot is drawn", () => {
     last = up;
   }
   assert.ok(liftOf(40) > 0.5 && liftOf(254) > 0.9);
+});
+
+test("median: the middle reading, so one or two jolts never win", () => {
+  assert.equal(median([]), 0);
+  assert.equal(median([3, 40, 2]), 3);
+  assert.equal(median([1, 2, 3, 100]), 2.5);
+});
+
+// A wooden floor that isn't quite flat, while driving: the motion chip and the downward distance
+// jolt for one or two packets at a time (made-up numbers, about 8 packets a second for 10 seconds),
+// never more than two in any five in a row. Between jolts the readings wobble a little.
+function woodFloor(n = 80) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const jolt = i % 6 === 0 || (i % 12 === 1);                    // a board edge; every other one lasts two packets
+    out.push({
+      roll: (jolt ? (i % 4 ? 14 : -11) : 0) + Math.sin(i) * 3,
+      pitch: (jolt ? -12 : 0) + Math.cos(i * 1.3) * 3,
+      bottom: jolt ? (i % 4 ? 19 : null) : FLOOR_CM + Math.sin(i * 0.7) * 1.5,
+    });
+  }
+  return out;
+}
+
+test("driving over a floor that isn't flat: the 3D robot stays flat on the floor", () => {
+  const pose = newPose();
+  for (const r of woodFloor()) {
+    poseTilt(pose, r.roll, r.pitch);
+    poseLift(pose, r.bottom);
+    assert.equal(pose.roll, 0, "no lean");
+    assert.equal(pose.pitch, 0, "no lean");
+    assert.equal(pose.lift, 0, "no lift");
+  }
+});
+
+test("a robot that rests a little crooked doesn't flicker between leaning and not", () => {
+  const pose = newPose();
+  const seen = [];
+  for (let i = 0; i < 60; i++) { poseTilt(pose, 6.5 + Math.sin(i * 2.1) * 2.5, 0); seen.push(pose.tipped); }
+  const flips = seen.filter((v, i) => i && v !== seen[i - 1]).length;
+  assert.ok(flips <= 1, `flipped ${flips} times`);
+});
+
+test("really tipped or picked up: shows within a few readings, and goes back when it ends", () => {
+  const pose = newPose();
+  for (let i = 0; i < 10; i++) { poseTilt(pose, 0, 0); poseLift(pose, FLOOR_CM); }
+  let n = 0;
+  while (!pose.tipped) { poseTilt(pose, 25, -3); n++; assert.ok(n <= Math.ceil(STEADY / 2), "a real lean shows soon"); }
+  assert.equal(pose.roll, 25);
+  assert.ok(Math.abs(pose.pitch) < TILT_ON);
+  for (let i = 0; i < 3; i++) poseTilt(pose, 70, 0);
+  assert.equal(pose.roll, 60, "drawn no further than 60 degrees");
+  n = 0;
+  while (pose.lift === 0) { poseLift(pose, 40); n++; assert.ok(n <= Math.ceil(STEADY / 2), "a real lift shows soon"); }
+  assert.ok(pose.lift > 0.4);
+  for (let i = 0; i < STEADY; i++) { poseTilt(pose, 1, 1); poseLift(pose, FLOOR_CM); }
+  assert.equal(pose.roll, 0);
+  assert.equal(pose.lift, 0, "set down again");
+  for (let i = 0; i < STEADY; i++) poseTilt(pose, 30, 0);
+  poseReset(pose);
+  assert.equal(pose.roll, 0);
+  poseTilt(pose, 1, 0);
+  assert.equal(pose.roll, 0, "after a reset the old lean is gone: one new reading can't bring it back");
+});
+
+test("a floor too dark to see (nothing read underneath) is not a lift", () => {
+  const pose = newPose();
+  for (let i = 0; i < 20; i++) poseLift(pose, i % 3 ? null : 30);
+  assert.equal(pose.lift, 0);
 });
 
 test("line sensors: pale floor is bright, a black line is dark", () => {

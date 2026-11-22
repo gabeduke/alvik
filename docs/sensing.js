@@ -8,6 +8,7 @@
 //   cloudAdd(cloud, u, row, cm, now);           // on each sensors packet
 //   cloudAlpha(point, now);                     // how much of each point shows
 //   liftOf(bottom);                             // 0 on the floor .. 1 picked up high
+//   const pose = newPose();                     // tipped and picked up, steadied: see poseTilt, poseLift
 //   lineShade(raw);                             // 1 pale floor .. 0 black line
 //   const head = newCompass();                  // the heading, drawn with less lag
 //   compassNews(head, heading, turn);           // on each packet
@@ -133,6 +134,61 @@ export function liftOf(bottom) {
   if (bottom === null || bottom === undefined) return 0;
   const up = bottom - FLOOR_CM - LIFT_SLACK_CM;
   return up <= 0 ? 0 : up / (up + LIFT_HALF_CM);
+}
+
+// Tipped and picked up, without the wobble. Driving over a floor that is not quite flat (wooden
+// boards, a rug's edge) jolts the motion chip and the downward distance for a reading or two at a
+// time, so the raw numbers would make the 3D robot jump off the floor and back. So the page goes by
+// the middle of the last few readings (one or two jolts never win), and a lean or a lift has to pass
+// a higher mark to start than it needs to keep going, so a robot sitting near the mark doesn't flicker.
+//
+//   const pose = newPose();
+//   poseTilt(pose, roll, pitch);                 // on each sensors packet
+//   poseLift(pose, bottom);                      // on each under-the-robot packet
+//   then draw pose.roll, pose.pitch (degrees) and pose.lift (0..1)
+export const STEADY = 5;                        // readings (about 0.6 s): the middle of this many is used
+export const TILT_ON = 8, TILT_OFF = 5;         // degrees: a lean starts past this, and ends under that
+const TILT_MAX = 60;
+export const LIFT_ON_CM = 6, LIFT_OFF_CM = 3;   // cm past FLOOR_CM: a lift starts past this, and ends under that
+
+/** The middle of some numbers. */
+export function median(values) {
+  const v = [...values].sort((a, b) => a - b), n = v.length;
+  if (!n) return 0;
+  return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+}
+const keep = (list, v) => { list.push(v); if (list.length > STEADY) list.shift(); };
+
+/** Nothing seen yet: taken to be flat on the floor, so the first jolt can't win either. */
+export function newPose() {
+  const flat = (v) => Array(STEADY).fill(v);
+  return { rolls: flat(0), pitches: flat(0), bottoms: flat(FLOOR_CM), tipped: false, lifted: false, roll: 0, pitch: 0, lift: 0 };
+}
+/** A sensors packet: roll and pitch in degrees, as the robot's motion chip gives them. */
+export function poseTilt(pose, roll, pitch) {
+  keep(pose.rolls, roll || 0);
+  keep(pose.pitches, pitch || 0);
+  const r = median(pose.rolls), p = median(pose.pitches);
+  const most = Math.max(Math.abs(r), Math.abs(p));
+  pose.tipped = most >= (pose.tipped ? TILT_OFF : TILT_ON);
+  const clamp = (v) => Math.max(-TILT_MAX, Math.min(TILT_MAX, v));
+  pose.roll = pose.tipped ? clamp(r) : 0;
+  pose.pitch = pose.tipped ? clamp(p) : 0;
+  return pose;
+}
+/** An under-the-robot packet: the bottom distance in cm (null = nothing seen, taken as the floor:
+ *  a dark floor can swallow the sensor's light). */
+export function poseLift(pose, bottom) {
+  keep(pose.bottoms, bottom === null || bottom === undefined ? FLOOR_CM : bottom);
+  const b = median(pose.bottoms);
+  pose.lifted = b - FLOOR_CM >= (pose.lifted ? LIFT_OFF_CM : LIFT_ON_CM);
+  pose.lift = pose.lifted ? liftOf(b) : 0;
+  return pose;
+}
+/** The robot went away, or the page stopped showing these: flat on the floor again. */
+export function poseReset(pose) {
+  Object.assign(pose, newPose());
+  return pose;
 }
 
 // Line sensors. About 50 on a pale desk on the real robot; a black line, or no floor at all, reads

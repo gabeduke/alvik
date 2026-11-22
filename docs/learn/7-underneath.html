@@ -50,7 +50,7 @@
     <li><b>Line sensors:</b> three lights shining down. Pale floor reflects (low number), black tape soaks it up (high number).</li>
     <li><b>Colour sensor:</b> <code>red, green, blue = alvik.get_color()</code>, each 0 to 1. The page paints the patch with them.</li>
     <li><b>Picked up:</b> the downward distance reads about 7 cm on a desk. If it grows, the robot was lifted.</li>
-    <li><b>Tipped:</b> a motion chip gives roll and pitch. The page ignores leans under 4 degrees so it doesn't wobble.</li>
+    <li><b>Tipped:</b> a motion chip gives roll and pitch. The page ignores leans under 8 degrees, and bumps that last only a moment, so it doesn't wobble on a bumpy floor.</li>
   </ul>
   <p>New sensor, new packet letter: old pages skip letters they don't know, so nothing breaks.</p>
 </section>

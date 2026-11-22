@@ -52,8 +52,7 @@ test("the numbers the lessons quote are still the robot's numbers", () => {
     "src/demo.py": ["START = 1 ", "PAGE = 6 ", "((1, 0, 1), run_remote)"],
     "src/hand_follower.py": ["reference = 10.0"],
     "docs/index.html": ["const DEAD = 0.18;", "now - sentAt > 150"],
-    "docs/sensing.js": ["SEE_CM = 40", "CLOUD_MS = 1200", "FLOOR_CM = 7.4"],
-    "docs/twin.js": ["Math.abs(s.roll) < 4"],
+    "docs/sensing.js": ["SEE_CM = 40", "CLOUD_MS = 1200", "FLOOR_CM = 7.4", "TILT_ON = 8"],
   };
   for (const [file, facts] of Object.entries(quoted)) {
     const text = read(...file.split("/"));

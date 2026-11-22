@@ -19,7 +19,7 @@
 // Draws only when something changes, so an idle page costs nothing.
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/loaders/GLTFLoader.js";
-import { VIEW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep,
+import { VIEW_CM, ZONES, ease, wrap, newHeat, easeHeat, heatAt, lineShade, newPose, poseTilt, poseLift, poseReset, newCompass, compassNews, compassStep,
   newCloud, cloudAdd, cloudAlpha, ROW_BOTTOM, ROW_FRONT, ROW_TOP } from "./sensing.js";
 
 const WHEEL_R = 0.017, TRACK = 0.0895;          // metres: wheel radius, distance between the wheels
@@ -187,6 +187,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
   let lights = [[0, 0, 0], [0, 0, 0]];
   let roll = 0, pitch = 0, rollNow = 0, pitchNow = 0;      // degrees: latest from the robot, and drawn
   let lift = 0, liftNow = 0;                    // 0 on the floor .. 1 held high: latest, and drawn
+  const pose = newPose();                       // the readings behind roll, pitch and lift, steadied (sensing.js)
   let ground = null, patchNow = 0;              // the floor's colour [r, g, b] (null = not known), and how much of the patch shows
   const groundNow = [0, 0, 0];
   let lines = [null, null, null];               // line sensors, left to right: raw readings
@@ -346,7 +347,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       zones = [null, null, null, null, null];
       cloud.points.length = 0; cloud.next = 0;
       lights = [[0, 0, 0], [0, 0, 0]];
-      roll = pitch = 0;
+      roll = pitch = 0; poseReset(pose);
       lift = 0; ground = null; lines = [null, null, null];
       wake();
     },
@@ -354,14 +355,13 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
     sensors(s) {
       const now = performance.now();
       if (on.cloud) s.zones.forEach((cm, i) => cloudAdd(cloud, i + (Math.random() - 0.5) * 0.7, ROW_FRONT, cm, now, (Math.random() - 0.5) * 0.01));
-      // small leans are just the floor and the sensor's noise
-      roll = !on.under || Math.abs(s.roll) < 4 ? 0 : Math.max(-60, Math.min(60, s.roll));
-      pitch = !on.under || Math.abs(s.pitch) < 4 ? 0 : Math.max(-60, Math.min(60, s.pitch));
+      // small leans, and jolts from a floor that isn't quite flat, are left out (poseTilt)
+      if (on.under) { poseTilt(pose, s.roll, s.pitch); roll = pose.roll; pitch = pose.pitch; }
       wake();
     },
     /** u = parsed under-the-robot packet (telemetry.js): line sensors, the floor's colour, how far down the floor is. */
     under(u) {
-      if (on.under) { lines = u.lines; ground = u.floor; lift = liftOf(u.bottom); }
+      if (on.under) { lines = u.lines; ground = u.floor; poseLift(pose, u.bottom); lift = pose.lift; }
       // the sensor's low and high rows, each one reading for the whole width
       const now = performance.now();
       if (on.cloud) {
@@ -383,7 +383,7 @@ export async function createTwin(canvas, { modelUrl = "models/alvik.glb" } = {})
       heatMesh.visible = on.heat;
       cloudMesh.visible = on.cloud;
       if (!on.cloud) { cloud.points.length = 0; cloud.next = 0; }
-      if (!on.under) { lines = [null, null, null]; ground = null; lift = 0; roll = pitch = 0; }
+      if (!on.under) { lines = [null, null, null]; ground = null; lift = 0; roll = pitch = 0; poseReset(pose); }
       wake();
     },
     resize: place,
