@@ -337,12 +337,6 @@ static void drawRadar() {
     radar.setTextColor(TFT_RED);
     radar.drawString("STOP!", cx, 4, 4);
   }
-  if (!t.bumper) {                           // easy to forget it is off: say so in big letters
-    radar.fillRect(0, 0, RW, 20, TFT_RED);
-    radar.setTextDatum(TC_DATUM);
-    radar.setTextColor(TFT_WHITE);
-    radar.drawString("BUMPER OFF", cx, 2, 2);
-  }
   radar.pushSprite(0, 26);
 }
 
