@@ -32,8 +32,12 @@ does nothing by itself. To change the bumper or tilt steering:
 | stick in + right top button, held | tilt steering on / off: hold up and tip the Wio like a steering wheel to curve |
 
 Let go early and the button does its ordinary job (lights or dance), so a quick press still works
-with the stick clicked in. While the bumper is off, the side panel says NO BUMP in red. The robot
-turns the bumper back on each time a remote connects.
+with the stick clicked in. While the bumper is off, the side panel says NO BUMP in red.
+
+**The Wio starts with the bumper off**, each time it connects (and tilt steering off too). The robot
+itself starts every connection with its bumper on, so the Wio switches it off straight away: the
+robot's lights flash red once when it connects. To start with the bumper on instead, set
+`BUMPER_AT_START` to `true` in the sketch. The web remote and the phone app still start with it on.
 
 The screen: battery, speed, what is ahead, a compass, turbo and bumper (as the robot reports them),
 and a radar seen from above. The radar shows the robot with its light colours, the floor's colour under

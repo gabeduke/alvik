@@ -10,6 +10,7 @@
 //   5-way press         nothing by itself (a child's thumb clicks it all the time while driving)
 // Grown-up switches: press the stick in and keep it in, then hold a top button for 1.5 s:
 //   left = bumper on / off, right = tilt steering on / off. The screen shows which and how long.
+//   Both start off each time (BUMPER_AT_START below; the robot itself starts with its bumper on).
 //   The logic is in wio_buttons.h, tested on a computer (tests/test_robot.py WioButtons).
 //
 // It has driven a real Alvik. See README.md next to this file for setup and what is still unchecked.
@@ -33,6 +34,8 @@ static const float TILT_DEAD_DEG = 6;        // less than this = straight
 static const float TILT_SIGN = 1;            //   the tilt bar should lean the way you tip it (else -1 / other axis)
 static const uint32_t RESEND_MS = 150;       // repeat the stick this often while it is held (robot stops after 600 ms quiet)
 static const uint32_t HOLD_MS = 1500;       // grown-up switches: stick pressed in + a top button held this long
+static const bool BUMPER_AT_START = false;   // the bumper when the Wio connects. The robot starts every connection
+                                             //   with it on, so false = the Wio switches it off straight away
 static const uint32_t DRAW_MS = 80;
 // top buttons, left to right as you hold it, and the robot button each one presses (1 lights, 2 turbo, 3 dance)
 // (if they come out in the wrong order on your Wio, swap the pins here)
@@ -84,6 +87,9 @@ static uint32_t lastT = 0, lastS = 0, lastU = 0, askedAt = 0;
 static int sentX = 0, sentY = 0;
 static uint32_t sentAt = 0;
 static bool tilt = false;
+static bool bumperSettled = false;           // this connection: the bumper has been put the way BUMPER_AT_START says
+static int bumperAsks = 0;
+static uint32_t bumperAskedAt = 0;
 static float tiltDeg = 0;
 static alvik::TopButtons tops(HOLD_MS);
 static bool shift = false;                   // the stick is pressed in (and not pushed any way): grown-up switches
@@ -185,6 +191,9 @@ static bool hookUp() {
   uint8_t p[5];
   alvik::joystickPacket(p, 0, 0); write(p, 5);         // start from standing still
   alvik::telemetryRequest(p, true); write(p, 5);
+  ringTail = ringHead;                       // nothing left over from the last connection
+  bumperSettled = false;
+  bumperAsks = 0;
   dbg("asked for telemetry, subscribing");
   tx->registerForNotify(onNotify);
   dbg("subscribed");
@@ -192,6 +201,25 @@ static bool hookUp() {
   askedAt = millis();
   sentX = sentY = 0;
   return true;
+}
+
+// The bumper at the start of a connection. Called on each telemetry packet: once the robot has said
+// how its bumper stands, press its bumper button if that isn't how the Wio starts (BUMPER_AT_START),
+// and again a second later if that got lost (three tries). After that it is left alone, so the
+// grown-up switch stays in charge.
+static void startBumper(uint32_t now) {
+  if (bumperSettled) return;
+  if (reader.t.bumper == BUMPER_AT_START || bumperAsks >= 3) {
+    bumperSettled = true;
+    dbg("bumper: robot says %s after %d asks", reader.t.bumper ? "on" : "off", bumperAsks);   // USB serial only by now
+    return;
+  }
+  if (bumperAsks && now - bumperAskedAt < 1000) return;
+  uint8_t p[5];
+  alvik::buttonPacket(p, 4, true); send(p, 5);
+  alvik::buttonPacket(p, 4, false); send(p, 5);
+  bumperAsks++;
+  bumperAskedAt = now;
 }
 
 // ---------- input ----------
@@ -445,7 +473,7 @@ void loop() {
   if (n) {
     int got = reader.feed(chunk, n);
     uint32_t now = millis();
-    if (got & alvik::Reader::GOT_T) lastT = now;
+    if (got & alvik::Reader::GOT_T) { lastT = now; startBumper(now); }
     if (got & alvik::Reader::GOT_U) lastU = now;
     if (got & alvik::Reader::GOT_S) {
       lastS = now;
