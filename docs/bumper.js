@@ -12,11 +12,12 @@
 export const SPEED = 8, TURBO_SPEED = 13;       // cm/s
 export const TURN = 90;                         // deg/s
 export const BUMPER_CM = 8;                     // stop when something is closer than this in front
-export const SLOW_CM = 14;                      // start slowing down when something is closer than this (the floor shows at 16-18)
+export const SLOW_CM = 12;                      // start slowing down when something is closer than this (the floor shows at 13.5-18)
 export const FLOOR_SLACK_CM = 2;                // once a zone has learnt where the floor shows, readings this close to it are floor too
 export const FLOOR_PROOF_CM = 4;                // drive this far at a thing: if it came no closer, it was the floor all along
 export const CLOSER_CM = 1.5;                   // a reading has to drop by this much to count as "came closer"
 export const SURE = 3;                          // a thing has to show in this many new readings in a row to count
+export const MIDDLE = [1, 3];                   // which of the five distance readings the bumper asks: half left and half right
 export const ACCEL = 30, DECEL = 60;            // cm/s per second: speeding up gently, slowing down quicker
 export const TURN_ACCEL = 540;                  // deg/s per second
 
@@ -43,7 +44,7 @@ export function bumperLimit(d, speed) {
 }
 
 /** One zone of the distance sensor: is something really there, closer than SLOW_CM? With nothing
- *  ahead the sensor sees the floor 16-18 cm away, so the floor is nothing. A thing has to show SURE
+ *  ahead the sensor sees the floor 13.5-18 cm away, so the floor is nothing. A thing has to show SURE
  *  times in a row (fewer is a blip), and one that comes no closer while the robot drives
  *  FLOOR_PROOF_CM at it was the floor after all. */
 export class Zone {
@@ -74,12 +75,14 @@ export class Zone {
   }
 }
 
-/** What is in the way, as one distance in cm: the middle of the middle three zones' answers, so two
- *  zones out of three have to see a thing. One zone's stray reflection does nothing. */
+/** What is in the way, as one distance in cm, from the sensor's two middle cells. Of the five
+ *  readings only four are cells of their own: the middle one is the mean of the two beside it
+ *  (Arduino's firmware makes it so). The bumper asks those two, and both have to see a thing; it is
+ *  then as far off as the further one says. One cell's stray reflection does nothing. */
 export class Bumper {
   constructor() {
-    this.zones = [new Zone(), new Zone(), new Zone()];
-    this.last = null;           // the readings the zones last looked at (the sensor repeats itself between new ones)
+    this.zones = [new Zone(), new Zone()];
+    this.last = null;           // the readings the cells last looked at (the sensor repeats itself between new ones)
     this.moved = 0;             // cm driven since then
     this.ahead = null;
   }
@@ -91,10 +94,9 @@ export class Bumper {
     const key = JSON.stringify(distances.map((d) => d ?? null));
     if (key !== this.last) {
       this.last = key;
-      const near = this.zones.map((zone, i) => zone.see(distances[i + 1] ?? null, this.moved))
-        .filter((d) => d !== null).sort((a, b) => a - b);
+      const seen = this.zones.map((zone, i) => zone.see(distances[MIDDLE[i]] ?? null, this.moved));
       this.moved = 0;
-      this.ahead = near.length >= 2 ? near[1] : null;
+      this.ahead = seen.includes(null) ? null : Math.max(...seen);
     }
     return this.ahead;
   }

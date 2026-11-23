@@ -556,6 +556,14 @@ class TimedLink:
     def stop(self): pass
 
 
+def five(left, half_left, half_right, right):
+    """The distance sensor's five readings as Arduino's firmware makes them (Arduino_AlvikCarrier,
+    src/sensor_tof_matrix.h): four cells of the sensor, and a "centre" that is not a cell of its own
+    but the mean of the two middle ones."""
+    mid = None if half_left is None or half_right is None else (half_left + half_right) / 2
+    return (left, half_left, mid, half_right, right)
+
+
 class RemoteDriving(RobotTest):
     def drive(self, timeline, until=4000, distance=None, heading=None):
         import remote_control
@@ -650,39 +658,58 @@ class RemoteDriving(RobotTest):
     def open_floor(t):
         wobble = ((t // 30) * 7 % 23) / 10            # 0 .. 2.2, different every reading
         far = 180 if (t // 30) % 17 == 0 else None
-        return (far or 16 + wobble, 18.2 - wobble, far or 16.5 + wobble / 2, 17.3, 180)
+        return five(far or 16 + wobble, 18.2 - wobble, far or 16.5 + wobble / 2, 180)
 
-    # A shiny kitchen table: the table where the floor would be, plus stray reflections. One zone at a
-    # time often reads something close for a while, and now and then all of them dip for one set of
-    # readings (the nose dipping as it speeds up or slows down).
+    # A shiny kitchen table: the table where the floor would be, plus stray reflections. One middle
+    # cell at a time often reads something close for a while (and the firmware's "centre" comes
+    # half way down with it), and now and then both dip for one set of readings (the nose dipping
+    # as it speeds up or slows down).
     @classmethod
     def kitchen_table(cls, t):
-        zones = list(cls.open_floor(t))
+        left, half_left, _, half_right, right = cls.open_floor(t)
         n = t // 60                                   # sets of readings
-        if n % 20 < 6:                                # a reflection in one zone, a third of a second long
-            zones[1 + (n // 20) % 3] = 6 + (n % 7)
+        if n % 20 < 6:                                # a reflection in one cell, a third of a second long
+            if (n // 20) % 2:
+                half_left = 6 + (n % 7)
+            else:
+                half_right = 6 + (n % 7)
         if n % 27 == 0:                               # everything dips, once
-            zones[1:4] = [12.5, 13, 12]
-        return tuple(zones)
+            half_left, half_right = 11, 10.5
+        return five(left, half_left, half_right, right)
+
+    # A floor that shows at the near end of what was read off the real robot (13.5 to 17 cm): both
+    # middle cells sit at 13.5 to 13.9 cm for five sets of readings in a row, again and again.
+    @staticmethod
+    def wooden_floor(t):
+        n = t // 60
+        low = n % 12 < 5
+        half_left = 13.5 + (n * 7 % 5) / 10 if low else 15 + (n * 7 % 23) / 10
+        half_right = 13.6 + (n * 3 % 4) / 10 if low else 15.4 + (n * 5 % 17) / 10
+        return five(half_left + 0.3, half_left, half_right, 180)
 
     def test_open_floor_is_not_something_in_the_way(self):
-        for floor in (self.open_floor, self.kitchen_table):
-            robot, rc = self.drive([(0, (5, True))], until=6000, distance=floor)
+        for floor in (self.open_floor, self.kitchen_table, self.wooden_floor):
+            robot, rc = self.drive([(0, (5, True))], until=12000, distance=floor)
             self.assertEqual(self.at(robot, 1000)[0], rc.SPEED)
-            self.assertEqual({l for t, l, a in robot.drives if 1000 <= t < 6000}, {rc.SPEED}, f"{floor.__name__}: never slows down")
-            self.assertNotIn(RED, [rgb for t, side, rgb in robot.leds], "and never warns")
+            self.assertEqual({l for t, l, a in robot.drives if 1000 <= t < 12000}, {rc.SPEED}, f"{floor.__name__}: never slows down")
+            self.assertNotIn(RED, [rgb for t, side, rgb in robot.leds], f"{floor.__name__}: and never warns")
 
-    def test_a_wall_is_slowed_for_and_stopped_at_on_a_kitchen_table(self):
-        def distance(t):                      # a wall 70 cm ahead that the robot drives up to; it shows once nearer than the table
-            table = self.kitchen_table(t)
-            wall = 70 - FakeAlvik.current.travelled(t)
-            return tuple(min(wall, f) for f in table)
-        robot, rc = self.drive([(0, (5, True))], until=30000, distance=distance)
-        seen = [(70 - robot.travelled(t), l) for t, l, a in robot.drives if t > 1000]
-        self.assertTrue(all(l == rc.SPEED for wall, l in seen if wall > rc.SLOW_CM), "full speed until 14 cm")
-        self.assertTrue(all(l < rc.SPEED for wall, l in seen if wall < rc.SLOW_CM - 2), "then always slower")
-        self.assertEqual(seen[-1][1], 0, "stopped")
-        self.assertTrue(6.5 < seen[-1][0] <= rc.BUMPER_CM, seen[-1][0])
+    def test_a_wall_is_slowed_for_and_stopped_at_on_any_floor(self):
+        for floor in (self.kitchen_table, self.wooden_floor):
+            def distance(t):                  # a wall 70 cm ahead that the robot drives up to; it shows once nearer than the floor
+                left, half_left, _, half_right, right = floor(t)
+                wall = 70 - FakeAlvik.current.travelled(t)
+                return five(min(wall, left), min(wall, half_left), min(wall, half_right), min(wall, right))
+            robot, rc = self.drive([(0, (5, True))], until=30000, distance=distance)
+            seen = [(70 - robot.travelled(t), l) for t, l, a in robot.drives if t > 1000]
+            self.assertTrue(all(l == rc.SPEED for wall, l in seen if wall > rc.SLOW_CM), f"{floor.__name__}: full speed until SLOW_CM")
+            self.assertTrue(any(l < rc.SPEED for wall, l in seen if rc.BUMPER_CM < wall < rc.SLOW_CM), f"{floor.__name__}: slowed on the way in")
+            # (On the table a cell that saw a reflection just before the wall can take the wall for the
+            # floor and let go again before the stop. Known, and it still stops.)
+            if floor == self.wooden_floor:
+                self.assertTrue(all(l < rc.SPEED for wall, l in seen if wall < rc.SLOW_CM - 2), f"{floor.__name__}: then always slower")
+            self.assertEqual(seen[-1][1], 0, "stopped")
+            self.assertTrue(6.5 < seen[-1][0] <= rc.BUMPER_CM, seen[-1][0])
 
     def test_turning_away_from_a_wall_onto_open_floor_lets_go(self):
         def distance(t):                      # a wall 13 cm ahead; at 2 s the robot has turned away from it
@@ -740,20 +767,20 @@ class FloorOrThing(RobotTest):
 
     def test_standing_still_nothing_is_decided(self):
         zone, rc = self.zone()
-        self.assertEqual([zone.see(12) for _ in range(200)][-1], 12, "a thing stays a thing until we drive at it")
+        self.assertEqual([zone.see(11) for _ in range(200)][-1], 11, "a thing stays a thing until we drive at it")
 
     def test_a_thing_that_comes_no_closer_as_we_drive_at_it_is_the_floor(self):
-        zone, rc = self.zone()                 # a nose-down robot, or a bump in the table: the floor shows at 12 cm
-        seen = [zone.see(12 + (i % 3) * 0.3, 0.2) for i in range(60)]
+        zone, rc = self.zone()                 # a nose-down robot, or a bump in the table: the floor shows at 10.5 cm
+        seen = [zone.see(10.5 + (i % 3) * 0.3, 0.2) for i in range(60)]
         self.assertIsNotNone(seen[rc.SURE - 1], "taken for a thing at first")
         gone = seen.index(None, rc.SURE)
         self.assertLessEqual(gone * 0.2, rc.FLOOR_PROOF_CM + 1.5, "let go after driving this far")
         self.assertEqual(set(seen[gone:]), {None}, "and it stays the floor")
-        self.assertIsNone(zone.see(11.5), "standing still too")
-        self.assertEqual([zone.see(d, 0.2) for d in (9.5, 9.3, 9.1, 8.9, 8.7)][rc.SURE - 2:], [None, 9.1, 8.9, 8.7],
+        self.assertIsNone(zone.see(10), "standing still too")
+        self.assertEqual([zone.see(d, 0.2) for d in (8.4, 8.3, 8.2, 8.1, 8.0)][rc.SURE - 2:], [None, 8.2, 8.1, 8.0],
                          "something nearer than that floor is a thing")
         zone.see(17)
-        self.assertEqual([zone.see(12) for _ in range(rc.SURE)][-1], 12, "seeing past it forgets it")
+        self.assertEqual([zone.see(11) for _ in range(rc.SURE)][-1], 11, "seeing past it forgets it")
 
     def test_closer_than_the_bumper_distance_is_never_the_floor(self):
         zone, rc = self.zone()
@@ -761,7 +788,7 @@ class FloorOrThing(RobotTest):
 
 
 class WhatIsAhead(RobotTest):
-    """Bumper.look: two of the middle three zones have to agree."""
+    """Bumper.look: both of the sensor's two middle cells have to see a thing."""
 
     def settle(self, distances, looks=20):
         import remote_control as rc
@@ -773,20 +800,28 @@ class WhatIsAhead(RobotTest):
         for distances in ((None,) * 5, (140, 115, 108, 101, 83), (16.5, 16.8, 17.1, 17.4, 180), (5, 200, 200, 200, 5)):
             self.assertIsNone(self.settle(distances)[0], distances)
 
-    def test_one_zone_alone_is_nothing(self):
-        for distances in ((None, 6, 17, 17, None), (None, 17, 9, 17, None), (None, 200, 200, 5, None)):
+    def test_one_cell_alone_is_nothing(self):
+        # The "centre" reading is the mean of the two cells beside it, so it comes half way down
+        # with either of them: a reflection at 9 cm beside the floor at 18 reads 13.5 in the centre.
+        # That is still one cell.
+        for distances in (five(None, 9, 18, None), five(None, 6, 17, None), five(None, 17, 5, None), five(5, 200, 5, 5)):
             self.assertIsNone(self.settle(distances)[0], distances)
 
-    def test_two_zones_or_three_count(self):
-        self.assertAlmostEqual(self.settle((None, 12, 10, 17, None))[0], 12, delta=0.15, msg="the further of the two")
-        self.assertAlmostEqual(self.settle((None, 13, 9, 11, None))[0], 11, delta=0.15, msg="the middle of three")
-        ahead, rc = self.settle((None, 7, 7.5, 7, None))
+    def test_the_centre_reading_is_not_asked(self):
+        self.assertIsNone(self.settle((None, 17, 6, 17, None))[0], "whatever it says")
+        self.assertAlmostEqual(self.settle((None, 10, 200, 11, None))[0], 11, delta=0.15)
+
+    def test_both_cells_count_and_the_further_one_says_how_far(self):
+        self.assertAlmostEqual(self.settle(five(None, 11, 10, None))[0], 11, delta=0.15, msg="the further of the two")
+        self.assertAlmostEqual(self.settle(five(None, 9, 11.5, None))[0], 11.5, delta=0.15)
+        ahead, rc = self.settle(five(None, 7, 7.5, None))
         self.assertEqual(rc.bumper_limit(ahead, rc.SPEED), 0)
 
-    def test_the_kitchen_table_changes_nothing(self):
+    def test_the_kitchen_table_and_the_wooden_floor_change_nothing(self):
         import remote_control as rc
-        eyes = rc.Bumper()
-        self.assertEqual({eyes.look(RemoteDriving.kitchen_table(t // 60 * 60), 0.24) for t in range(0, 20000, 30)}, {None})
+        for floor in (RemoteDriving.kitchen_table, RemoteDriving.wooden_floor):
+            eyes = rc.Bumper()
+            self.assertEqual({eyes.look(floor(t // 60 * 60), 0.24) for t in range(0, 20000, 30)}, {None}, floor.__name__)
 
     def test_the_same_readings_again_are_not_new(self):
         import remote_control as rc
@@ -806,26 +841,29 @@ class SharedSums(RobotTest):
     def scenes(self):
         wobble = lambda i: (i * 7 % 23) / 10 - 1.1                  # -1.1 .. 1.1, the same every time
         step = 0.24                                                 # cm driven between looks at 8 cm/s
-        floor = lambda i: [17 + wobble(i) / 2, 17 - wobble(i), 17 + wobble(i + 3), 17 + wobble(i + 9) / 2, 180]
-        wall = [[[min(f, 40 - i * step + w) for f, w in zip(floor(i), (0, wobble(i) / 4, 0, -wobble(i) / 4, 0))], step]
+        # four cells: left, half left, half right, right (five() adds the firmware's "centre")
+        floor = lambda i: [17 + wobble(i) / 2, 17 - wobble(i), 17 + wobble(i + 3), 180]
+        wall = [[five(*[min(f, 40 - i * step + w) for f, w in zip(floor(i), (0, wobble(i) / 4, -wobble(i) / 4, 0))]), step]
                 for i in range(140)]
-        table = [[[d if not (i % 40 < 10 and z == 1 + (i // 40) % 3) else 6 + i % 7 for z, d in enumerate(floor(i))], step]
+        table = [[five(*[d if not (i % 40 < 10 and z == 1 + (i // 40) % 2) else 6 + i % 7 for z, d in enumerate(floor(i))]), step]
                  for i in range(160)]
-        dips = [[floor(i)[:1] + ([12.5, 13, 12] if i % 20 < 2 else floor(i)[1:4]) + [180], step] for i in range(80)]
-        leg = [[[None, 17, 30 - i * step, 17, None], step] for i in range(100)]
-        nose_down = [[[None, 12 + wobble(i) / 5, 12, 12 - wobble(i) / 5, None], step] for i in range(60)]
-        turn = [[[None, 11, 11, 11, None], 0]] * 12 + [[floor(i), 0] for i in range(12)]
-        looks = [("driving up to a wall", wall), ("a kitchen table: one zone at a time sees a reflection", table),
-                 ("all zones dip for two readings", dips), ("a chair leg dead ahead", leg),
+        dips = [[five(floor(i)[0], *([11, 10.5] if i % 20 < 2 else floor(i)[1:3]), 180), step] for i in range(80)]
+        low = [[five(17, 13.5 + i % 5 / 10, 13.6 + i % 4 / 10, 180) if i % 12 < 5 else five(*floor(i)), step] for i in range(96)]
+        leg = [[five(None, 30 - i * step, 17, None), step] for i in range(100)]
+        nose_down = [[five(None, 10.5 + wobble(i) / 5, 10.5 - wobble(i) / 5, None), step] for i in range(60)]
+        turn = [[five(None, 10, 10, None), 0]] * 12 + [[five(*floor(i)), 0] for i in range(12)]
+        looks = [("driving up to a wall", wall), ("a kitchen table: one cell at a time sees a reflection", table),
+                 ("both middle cells dip for two readings", dips), ("the floor shows at 13.5 cm, five readings at a time", low),
+                 ("a chair leg in one cell", leg),
                  ("nose down: it shows closer, and comes no closer", nose_down), ("turning away from a wall onto open floor", turn)]
         zones = [("a wall driven up to", [[30 - i * step, step] for i in range(100)]),
                  ("the floor, standing still then driving", [[17 + wobble(i), step if i > 20 else 0] for i in range(80)]),
                  ("nothing, a blip, nothing", [[None, 0]] * 3 + [[9, 0]] * 3 + [[None, 0]] * 3 + [[9, 0]] * 7),
-                 ("the floor shows closer, then normal again", [[12, step]] * 30 + [[17, step]] * 3 + [[12, step]] * 8)]
+                 ("the floor shows closer, then normal again", [[10.5, step]] * 30 + [[17, step]] * 3 + [[10.5, step]] * 8)]
         ramps = [[0, 8, 0.9, 1.8], [7.5, 8, 0.9, 1.8], [8, 8, 0.9, 1.8], [8, 0, 0.9, 1.8], [1, 0, 0.9, 1.8], [8, -8, 0.9, 1.8],
                  [-8, 8, 0.9, 1.8], [-0.5, 8, 0.9, 1.8], [8, 4, 0.9, 1.8], [-8, -3, 0.9, 1.8], [0, -8, 0.9, 1.8],
                  [0, 90, 16.2, 16.2], [90, -90, 16.2, 16.2], [-10, 0, 16.2, 16.2]]
-        limits = [[d, speed] for speed in (8, 13) for d in (None, 0, 5, 7.99, 8, 8.5, 11, 13.9, 14, 100)]
+        limits = [[d, speed] for speed in (8, 13) for d in (None, 0, 5, 7.99, 8, 8.5, 10, 11.9, 12, 14, 100)]
         return looks, zones, ramps, limits
 
     def test_the_shared_examples_are_this_codes_answers(self):
@@ -835,7 +873,7 @@ class SharedSums(RobotTest):
         now = {"note": "Examples for docs/bumper.js, with the answers of src/remote_control.py. Written by tests/test_robot.py.",
                "numbers": {k: getattr(rc, k) for k in (
                    "SPEED", "TURBO_SPEED", "TURN", "BUMPER_CM", "SLOW_CM", "FLOOR_SLACK_CM", "FLOOR_PROOF_CM",
-                   "CLOSER_CM", "SURE", "ACCEL", "DECEL", "TURN_ACCEL",
+                   "CLOSER_CM", "SURE", "MIDDLE", "ACCEL", "DECEL", "TURN_ACCEL",
                    "STICK_TIMEOUT_MS", "SLOW_FLASH_MS", "STOP_FLASH_MS", "TELEMETRY_MS", "COLORS")},
                "dance": {k: getattr(__import__("dance"), k) for k in ("DISCO", "DANCE_MS", "BEAT_MS", "WIGGLE", "SPIN")},
                "ramp": [r + [rnd(rc.ramp(*r))] for r in ramps],
@@ -851,9 +889,10 @@ class SharedSums(RobotTest):
         # the examples must show the interesting things, or they prove little
         by = {scene["note"]: scene["ahead"] for scene in now["looks"]}
         self.assertLess(by["driving up to a wall"][-1], rc.BUMPER_CM)
-        self.assertEqual(set(by["a kitchen table: one zone at a time sees a reflection"]), {None})
-        self.assertEqual(set(by["all zones dip for two readings"]), {None})
-        self.assertEqual(set(by["a chair leg dead ahead"]), {None})
+        self.assertEqual(set(by["a kitchen table: one cell at a time sees a reflection"]), {None})
+        self.assertEqual(set(by["both middle cells dip for two readings"]), {None})
+        self.assertEqual(set(by["the floor shows at 13.5 cm, five readings at a time"]), {None})
+        self.assertEqual(set(by["a chair leg in one cell"]), {None})
         self.assertIsNone(by["nose down: it shows closer, and comes no closer"][-1])
         self.assertIsNone(by["turning away from a wall onto open floor"][-1])
         if os.environ.get("WRITE_VECTORS"):

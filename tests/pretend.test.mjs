@@ -105,7 +105,7 @@ test("drives up to the box, slows, stops BUMPER_CM short and flashes red; revers
   assert.ok(r.view().linear < 0);
 });
 
-test("on open floor the floor's reading shows in the cloud but does not slow it", () => {
+test("on open floor the floor's reading shows in what the sensor sends but does not slow it", () => {
   const empty = { ...ROOM, w: 400, h: 400, start: { x: 200, y: 200 }, boxes: [], posts: [], mats: [], tape: [] };
   const r = robot(empty);
   r.driving(0, 100, 6000);
@@ -124,18 +124,22 @@ test("bumper off: it drives into the box and stays outside it", () => {
   assert.equal(r.got.T.at(-1).bumper, false);
 });
 
-test("a chair leg in one zone does not slow it; it only stops once two zones see the leg, very close", () => {
+test("a chair leg to one side fills one cell only: the bumper does nothing and the robot bumps into it", () => {
+  const post = ROOM.posts[0];
+  const r = robot({ ...ROOM, start: { x: post.x + 2.5, y: post.y - 36 }, tape: [], mats: [] });
+  const gap = () => Math.hypot(post.x - r.view().x, post.y - r.view().y) - post.r - 4.8;
+  r.driving(0, 100, 8000);
+  assert.ok(r.got.T.every((t) => t.distance === null && !t.blocked), "one cell alone is nothing");
+  assert.ok(r.got.S.some((s) => s.zones.some((d) => d < 10)), "though the sensor saw it");
+  assert.ok(gap() < 2, `up against the leg: ${gap().toFixed(1)} cm from its nose`);
+});
+
+test("a chair leg dead ahead is in both middle cells: it stops for it like a wall", () => {
   const post = ROOM.posts[0];
   const r = robot({ ...ROOM, start: { x: post.x, y: post.y - 36 }, tape: [], mats: [] });
-  const gap = () => post.y - post.r - (r.view().y + 4.8);
-  let slowedAt = null;
-  r.run(8000, (t) => {
-    if (t % 150 === 0) r.stick(0, 100);
-    if (slowedAt === null && r.view().linear < 8 && t > 1000) slowedAt = gap();
-  });
-  assert.ok(slowedAt !== null && slowedAt < 9, `full speed until ${slowedAt?.toFixed(1)} cm from the leg: one zone alone is nothing`);
-  const end = gap();
-  assert.ok(end > 2 && end < 6, `ends ${end.toFixed(1)} cm from the leg`);
+  r.driving(0, 100, 8000);
+  const gap = post.y - post.r - (r.view().y + 4.8);
+  assert.ok(r.view().blocked && gap > BUMPER_CM - 2 && gap < BUMPER_CM + 1.5, `stopped ${gap.toFixed(1)} cm from the leg`);
 });
 
 test("line sensors read dark over the tape, and the floor's colour changes on a mat", () => {

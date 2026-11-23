@@ -34,8 +34,12 @@ export const ROOM = {
 
 const RADIUS = 6;                                // the robot as a circle, for bumping into things
 const NOSE = 4.8;                                // the distance sensor, ahead of the robot's middle
-export const ZONE_DEG = [22, 11, 0, -11, -22];   // where the five zones look (left is positive): a guess
-const RAY_SPREAD = 2;                            // each zone looks a little to both sides too
+// The distance sensor's readings come from four cells side by side, each 15 degrees wide (left is
+// positive). As on the real robot, the fifth reading, "centre", is not a cell: it is the mean of
+// the two middle ones (Arduino's firmware, sensor_tof_matrix.h).
+export const CELL_DEG = [22.5, 7.5, -7.5, -22.5];
+const RAY_SPREAD = 6;                            // a cell sees this far to both sides of its middle
+export const ZONE_DEG = [CELL_DEG[0], CELL_DEG[1], 0, CELL_DEG[2], CELL_DEG[3]];   // where the five readings are drawn
 const EYE_X = 1.3, EYE_Y = 3.6;                  // the line sensors: apart, and ahead of the middle
 
 // ---------- readings (guesses that copy the real robot) ----------
@@ -139,7 +143,7 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
   let warn = 0, warnAt = 0, blocked = false, flashUntil = -1;
   let danceAt = null, lit = [COLORS[0], COLORS[0]];
   let eyes = new Bumper(), buf = [], seen = [null, null, null, null, null], ahead = null, frameAt = -FRAME_MS;
-  const blips = [0, 0, 0, 0, 0];                 // readings left in each zone's blip
+  const blips = [0, 0, 0, 0];                    // readings left in each cell's blip
   const noise = (size) => (random() - 0.5) * 2 * size;
 
   // the directions it faces: forward and to its left
@@ -148,9 +152,9 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
   function distances() {
     if (held) return [null, null, null, null, null];
     const [fx, fy] = forward(), ox = x + fx * NOSE, oy = y + fy * NOSE;
-    return ZONE_DEG.map((deg, i) => {
+    const [left, halfLeft, halfRight, right] = CELL_DEG.map((deg, i) => {
       let d = Infinity;
-      for (const off of [-RAY_SPREAD, 0, RAY_SPREAD]) {
+      for (const off of [-RAY_SPREAD, -RAY_SPREAD / 2, 0, RAY_SPREAD / 2, RAY_SPREAD]) {
         const a = rad(heading + deg + off);
         d = Math.min(d, rayLength(ox, oy, -Math.sin(a), Math.cos(a), room));
       }
@@ -160,6 +164,7 @@ export function createPretendRobot({ send = () => {}, random = Math.random, room
       if (d > 34 && random() < BLIP_CHANCE) blips[i] = 1 + Math.floor(random() * 2);
       return Math.max(0, d + noise(0.5));
     });
+    return [left, halfLeft, (halfLeft + halfRight) / 2, halfRight, right];
   }
 
   function under() {

@@ -24,47 +24,48 @@
 <section class="need">
   <h2>🧰 You need</h2>
   <ul><li>The robot and remote (or the pretend robot), and a wall or a big box.</li></ul>
-  <a class="go real" href="../?show=cloud,heat">🤖 Open the remote</a>
-  <a class="go" href="../?demo&amp;show=cloud,heat">🎮 Pretend robot</a>
+  <a class="go real" href="../?show=zones,bumper">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=zones,bumper">🎮 Pretend robot</a>
 </section>
 
 <section>
   <h2>▶️ Do it</h2>
   <ol class="steps">
     <li>Check <b>🛡️ Bumper</b> says "on". Drive straight at a wall and keep pushing.</li>
-    <li>At 14 cm it slows down: the lights blink red and yellow heat shows on the screen.</li>
-    <li>At 8 cm it stops: the lights flash fast and the heat turns red.</li>
+    <li>At 12 cm it slows down: the lights blink red and the middle blocks on the screen turn yellow.</li>
+    <li>At 8 cm it stops: the lights flash fast and the blocks turn red.</li>
     <li>Pull back. Reversing always works.</li>
-    <li>Drive at a chair leg. The real robot bumps into it. Why? Read on.</li>
+    <li>Drive at a chair leg, a little to one side of the nose. The robot bumps into it. Why? Read on.</li>
   </ol>
 </section>
 
 <section>
   <h2>🔍 How it works</h2>
-  <p>The sensor looks a little down, so on an empty floor it sees the floor about 17 cm ahead.
-    So the bumper only cares about things <b>closer than 14 cm</b>. Then two rules:</p>
+  <p>On an empty floor the sensor sees the floor: about 17 cm ahead, and now and then as close
+    as 13.5. So the bumper only cares about things <b>closer than 12 cm</b>. Then two rules:</p>
   <ol>
-    <li><b>Not a blip.</b> A zone has to see the thing in 3 new readings in a row. (The sensor
+    <li><b>Not a blip.</b> A cell has to see the thing in 3 new readings in a row. (The sensor
       makes new readings only every few trips round the loop; repeats don't count.)</li>
-    <li><b>Two out of three.</b> Of the middle three zones, two have to see it. One zone's stray
-      reflection does nothing.</li>
+    <li><b>Both middle cells.</b> The bumper asks the two cells in the middle: half left and half
+      right. Both have to see the thing. One cell's stray reflection does nothing. (It does not
+      ask the middle reading: that one is only half of each, so it says nothing new.)</li>
   </ol>
-  <pre><code>seen = [zone.see(d, self.moved) for zone, d in zip(self.zones, distances[1:4])]
-near = sorted(d for d in seen if d is not None)
-self.ahead = near[1] if len(near) &gt;= 2 else None</code></pre>
-  <p>One more: if the robot drives 4 cm at a "thing" and it comes no closer, it was the floor
-    (the robot is tipped forward a bit), and that zone ignores it from then on.</p>
+  <pre><code>seen = [zone.see(distances[i], self.moved) for zone, i in zip(self.zones, MIDDLE)]
+self.ahead = max(seen) if None not in seen else None</code></pre>
+  <p><code>MIDDLE = (1, 3)</code> picks the second and fourth reading. One more: if the robot
+    drives 4 cm at a "thing" and it comes no closer, it was the floor (the robot is tipped forward
+    a bit), and that cell ignores it from then on.</p>
 
-  <h3>Closest, or two out of three?</h3>
+  <h3>Closest, or both?</h3>
   <div class="play">
-    <label>Left zone <input type="range" id="z0" min="4" max="30" value="30"><output id="z0v"></output></label>
-    <label>Middle zone <input type="range" id="z1" min="4" max="30" value="30"><output id="z1v"></output></label>
-    <label>Right zone <input type="range" id="z2" min="4" max="30" value="30"><output id="z2v"></output></label>
+    <label>Half left <input type="range" id="z0" min="4" max="30" value="30"><output id="z0v"></output></label>
+    <label>Half right <input type="range" id="z1" min="4" max="30" value="30"><output id="z1v"></output></label>
+    <p class="verdict" id="mid"></p>
     <p class="verdict" id="closest"></p>
     <p class="verdict" id="two"></p>
   </div>
-  <p>All three at 10: a wall, both rules agree. Only the middle at 6: a chair leg, or a reflection.
-    "Closest" stops; "two out of three" drives on. We picked smooth driving over catching chair legs.
+  <p>Both at 10: a wall, the two rules agree. Only one at 6: a chair leg, or a reflection.
+    "Closest" stops; "both" drives on. We picked smooth driving over catching chair legs.
     That is a <b>trade-off</b>.</p>
 </section>
 
@@ -72,14 +73,14 @@ self.ahead = near[1] if len(near) &gt;= 2 else None</code></pre>
   <h2>🧪 Try this</h2>
   <ul>
     <li><b>Measure it.</b> Let the bumper stop the robot at a wall. Ruler from nose to wall: is it 8 cm?</li>
-    <li><b>Dots against heat.</b> On open floor the dots show the floor at 17 cm, and the heat shows nothing. That gap is this lesson.</li>
+    <li><b>Pale against yellow.</b> On open floor the blocks show the floor at 17 cm, and they stay pale: the bumper does nothing. That gap is this lesson.</li>
   </ul>
 </section>
 
 <section class="change">
   <h2>✏️ Change it</h2>
   <p>In <a href="https://github.com/gabeduke/alvik/blob/main/src/remote_control.py"><code>remote_control.py</code></a>,
-    <code>SLOW_CM = 14</code> and <code>BUMPER_CM = 8</code> set where it slows and stops, and
+    <code>SLOW_CM = 12</code> and <code>BUMPER_CM = 8</code> set where it slows and stops, and
     <code>SURE = 3</code> how sure it must be. Keep <code>SLOW_CM</code> under where your floor shows,
     or it will slow down for the floor. Lesson 3 says how to change a file on the robot.</p>
 </section>
@@ -94,15 +95,16 @@ const say = (d) => {
   return `<b class="clear">full speed</b>`;
 };
 function work() {
-  const z = [0, 1, 2].map((i) => Number($("z" + i).value));
+  const z = [0, 1].map((i) => Number($("z" + i).value));
   z.forEach((v, i) => { $("z" + i + "v").textContent = v + " cm"; });
-  const near = z.filter((v) => v < SLOW_CM).sort((a, b) => a - b);
-  const closest = near.length ? near[0] : null, two = near.length >= 2 ? near[1] : null;
+  const near = z.filter((v) => v < SLOW_CM);
+  const closest = near.length ? Math.min(...near) : null, both = near.length === 2 ? Math.max(...near) : null;
   const cm = (d) => (d === null ? "nothing" : d + " cm");
+  $("mid").textContent = `The middle reading would say ${(z[0] + z[1]) / 2} cm: half of each.`;
   $("closest").innerHTML = `Closest: ${cm(closest)} → ${say(closest)}`;
-  $("two").innerHTML = `Two out of three: ${cm(two)} → ${say(two)}`;
+  $("two").innerHTML = `Both: ${cm(both)} → ${say(both)}`;
 }
-[0, 1, 2].forEach((i) => $("z" + i).addEventListener("input", work));
+[0, 1].forEach((i) => $("z" + i).addEventListener("input", work));
 work();
 </script>
 

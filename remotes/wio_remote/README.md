@@ -22,7 +22,7 @@ own parser and `tests/telemetry_vectors.json`). Not checked yet: the rest of "Fi
 The screen: battery, speed, what is ahead, a compass, turbo and bumper (as the robot reports them),
 and a radar seen from above. The radar shows the robot with its light colours, the floor's colour under
 it, the line sensors at its nose, the distance sensor's raw readings as dots, and the bumper's view as
-an arc. The arc turns yellow from 14 cm and red from 8 cm, where the robot stops.
+an arc. The arc turns yellow from 12 cm and red from 8 cm, where the robot stops.
 
 ## Setup (once)
 

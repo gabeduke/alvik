@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1b1630">
 <title>👀 Seeing ahead · Alvik lessons</title>
-<meta name="description" content="Lesson 5: The distance sensor as a cloud of dots, and why it is often wrong.">
+<meta name="description" content="Lesson 5: The distance sensor as five blocks, and why it is often wrong.">
 <meta property="og:title" content="👀 Seeing ahead · Alvik lessons">
-<meta property="og:description" content="Lesson 5: The distance sensor as a cloud of dots, and why it is often wrong.">
+<meta property="og:description" content="Lesson 5: The distance sensor as five blocks, and why it is often wrong.">
 <meta property="og:image" content="https://gabeduke.github.io/alvik/img/share.png">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="learn.css">
@@ -18,7 +18,7 @@
 
 <p class="kicker">Lesson 5 of 9 · about 20 minutes</p>
 <h1>👀 Seeing ahead</h1>
-<p class="lead">The <b>distance sensor</b> in the nose comes online as a cloud of dots in front of the
+<p class="lead">The <b>distance sensor</b> in the nose comes online as five blocks in front of the
   3D robot. It sees a lot, and it is often wrong.</p>
 
 <section class="need">
@@ -27,40 +27,42 @@
     <li>The robot and remote, or the pretend robot.</li>
     <li>Your hand, a box, and some clear floor.</li>
   </ul>
-  <a class="go real" href="../?show=cloud">🤖 Open the remote</a>
-  <a class="go" href="../?demo&amp;show=cloud">🎮 Pretend robot</a>
+  <a class="go real" href="../?show=zones">🤖 Open the remote</a>
+  <a class="go" href="../?demo&amp;show=zones">🎮 Pretend robot</a>
 </section>
 
 <section>
   <h2>▶️ Do it</h2>
   <ol class="steps">
-    <li>Connect, with the robot facing a wall a little way off. Each dot is one reading. (Pretend robot: drive toward the box.)</li>
-    <li>Move your hand toward the nose. The dots follow.</li>
-    <li>Move your hand left to right. The sensor sees <b>five zones</b> side by side.</li>
-    <li>Face open floor. Do the dots go away?</li>
+    <li>Connect, with the robot facing a wall a little way off. Each block is one reading: it stands as far away as the sensor says. (Pretend robot: drive toward the box.)</li>
+    <li>Move your hand toward the nose. The blocks come closer with it.</li>
+    <li>Move your hand left to right. The sensor gives <b>five readings</b> side by side.</li>
+    <li>Face open floor. Do the blocks go away?</li>
   </ol>
-  <p class="note"><b>No.</b> With nothing ahead the dots sit about 17 cm away. The sensor tilts down and sees <b>the floor</b>.</p>
+  <p class="note"><b>No.</b> With nothing ahead the blocks sit about 17 cm away. The sensor sees <b>the floor</b> there.</p>
 </section>
 
 <section>
   <h2>🔍 How it works</h2>
   <p>It is a <b>time-of-flight</b> sensor: it flashes invisible light and times the bounce. Five
-    zones across the front, plus one up and one down:</p>
+    readings across the front, plus one up and one down:</p>
   <pre><code>left, half_left, middle, half_right, right = alvik.get_distance()
 top = alvik.get_distance_top()
 bottom = alvik.get_distance_bottom()</code></pre>
-  <p>The five go to the page in an <code>S</code> packet. Each dot fades after about a second, so a
-    tight clump means steady readings and a smear means <b>noise</b>. Nothing past 40 cm gets a dot.</p>
-  <p>Two habits: it reads <b>the floor</b> at 16 to 18 cm when nothing is ahead, and a zone looking far
+  <p>The five go to the page in an <code>S</code> packet. A block glides to each new reading, so a
+    block that will not keep still means <b>noise</b>. Nothing past 40 cm gets a block.</p>
+  <p>The sensor has four cells side by side. <code>middle</code> is not a cell of its own: the robot
+    makes it from the two beside it (half of each).</p>
+  <p>Two habits: it reads <b>the floor</b> at 16 to 18 cm when nothing is ahead, and a cell looking far
     away sometimes <b>blips</b> to the floor reading. Lesson 6 deals with both.</p>
 </section>
 
 <section class="try">
   <h2>🧪 Try this</h2>
   <ul>
-    <li><b>Thin things.</b> How many zones see a pencil? A chair leg? A book?</li>
+    <li><b>Thin things.</b> How many blocks does a pencil move? A chair leg? A book?</li>
     <li><b>Tricky things.</b> A mirror, a black sock, a shiny pan. Which fool it?</li>
-    <li><b>Find the floor.</b> Tip the nose up with a finger. Where do the dots go?</li>
+    <li><b>Find the floor.</b> Tip the nose up with a finger. Where do the blocks go?</li>
   </ul>
 </section>
 

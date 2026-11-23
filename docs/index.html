@@ -338,8 +338,10 @@ let toggledAt = 0;                      // when Turbo or Bumper was last pressed
 let demo = null;                        // the pretend robot's room, while "try it without a robot" is on (playroom.js)
 const asked = new URLSearchParams(location.search);
 // A lesson's link can leave sensors off the 3D robot, to add them one at a time:
-// ?show=cloud,heat,under (any of them, or none). No "show" at all = everything.
-const layers = asked.has("show") ? new Set(asked.get("show").split(",")) : null;
+// ?show=zones,bumper,under (any of them, or none). No "show" at all = everything.
+// (zones and bumper were called cloud and heat once: old links still work.)
+const layers = asked.has("show")
+  ? new Set(asked.get("show").split(",").map((k) => ({ cloud: "zones", heat: "bumper" })[k] || k)) : null;
 const stored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const store = (key, value) => { try { value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); return true; } catch { return false; } };
 // A guest is a device that first came here as a visitor and has not driven a real robot yet: it is
@@ -513,8 +515,8 @@ function showToggles() {
 // ---------- what the robot says back ----------
 function showDistance(t) {
   const info = $("twinInfo"), cm = t?.distance ?? null;
-  info.textContent = cm === null || cm > 99 || (layers && !layers.has("heat")) ? "" : `🧱 ${cm} cm`;
-  info.className = t?.blocked || (cm !== null && cm < 12) ? "stop" : cm !== null && cm < 30 ? "slow" : "";
+  info.textContent = cm === null || cm > 99 || (layers && !layers.has("bumper")) ? "" : `🧱 ${cm} cm`;
+  info.className = t?.blocked ? "stop" : cm !== null ? "slow" : "";     // a distance here means the bumper is acting on it
   const speed = Math.round(Math.abs(t?.speed ?? 0));
   $("twinSpeed").textContent = speed ? `💨 ${speed} cm/s` : "";
 }
@@ -712,7 +714,7 @@ import("./twin.js")
   .then(({ createTwin }) => { twinEl.hidden = false; return createTwin(twinEl.querySelector("canvas")); })
   .then((t) => {
     twin = t;
-    if (layers) twin.show({ cloud: layers.has("cloud"), heat: layers.has("heat"), under: layers.has("under") });
+    if (layers) twin.show({ zones: layers.has("zones"), bumper: layers.has("bumper"), under: layers.has("under") });
   })
   .catch((e) => { twinEl.hidden = true; console.warn("no 3D robot", e); });
 twinEl.addEventListener("click", (e) => {

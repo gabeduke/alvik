@@ -29,12 +29,14 @@ SPEED = 8            # cm/s
 TURBO_SPEED = 13     # cm/s (about Alvik's top speed)
 TURN = 90            # deg/s
 BUMPER_CM = 8        # stop when something is closer than this in front
-SLOW_CM = 14         # start slowing down when something is closer than this. With nothing ahead the
-                     # distance sensor sees the floor (or the table) 16-18 cm away, so this stays under that
+SLOW_CM = 12         # start slowing down when something is closer than this. With nothing ahead the
+                     # distance sensor sees the floor (or the table): 16-18 cm away on the real robot
+                     # standing level, and as close as 13.5 now and then. So this stays under that
 FLOOR_SLACK_CM = 2   # once a zone has learnt where the floor shows, readings this close to it are floor too
 FLOOR_PROOF_CM = 4   # drive this far at a thing: if it came no closer, it was the floor all along
 CLOSER_CM = 1.5      # a reading has to drop by this much to count as "came closer" (less is noise)
 SURE = 3             # a thing has to show in this many new readings in a row to count (one bad one is a blip)
+MIDDLE = (1, 3)      # which of the five distance readings the bumper asks: half left and half right
 ACCEL = 30           # cm/s per second: how gently it speeds up
 DECEL = 60           # cm/s per second: how quickly it slows down
 TURN_ACCEL = 540     # deg/s per second, for turning
@@ -126,8 +128,8 @@ def bumper_limit(d, speed):
 class Zone:
     """One zone of the distance sensor: is something really there, closer than SLOW_CM?
 
-    The sensor looks a little downwards, so with nothing ahead it sees the floor 16-18 cm away.
-    SLOW_CM is under that, so the floor is nothing. A reading only counts as a thing when:
+    With nothing ahead the sensor sees the floor, 13.5 to 18 cm away. SLOW_CM is under that, so
+    the floor is nothing. A reading only counts as a thing when:
       - it is closer than SLOW_CM (and closer than a floor this zone has learnt, see below), and
       - it shows in SURE new readings in a row: the sensor blips, and a single blip is not a thing.
     If the robot drives FLOOR_PROOF_CM at a thing and it comes no closer, it was the floor after
@@ -163,18 +165,20 @@ class Zone:
 
 
 class Bumper:
-    """What is in the way, as one distance in cm: the middle of the middle three zones' answers.
+    """What is in the way, as one distance in cm, from the sensor's two middle cells.
 
-    So two zones out of three have to see a thing before the robot slows down. One zone's stray
-    reflection does nothing, and a wall or a box counts. (Something narrow, like a chair leg, fills
-    one zone only: the robot bumps into it.)
+    The sensor gives five readings, but only four are cells of their own: the middle one is the mean
+    of the two beside it (Arduino's firmware makes it so), so it says nothing they did not. The
+    bumper asks those two, half left and half right, and both have to see a thing; it is then as far
+    off as the further one says. One cell's stray reflection does nothing, and a wall or a box
+    counts. (Something narrow, like a chair leg, fills one cell only: the robot bumps into it.)
     The sensor makes a new set of readings only every 30 to 300 ms, and get_distance() gives the
-    same ones again in between. So the zones only look when the readings change: one bad set of
+    same ones again in between. So the cells only look when the readings change: one bad set of
     readings is one blip, however many times round the loop it is read."""
 
     def __init__(self):
-        self.zones = [Zone(), Zone(), Zone()]
-        self.last = None        # the readings the zones last looked at
+        self.zones = [Zone(), Zone()]
+        self.last = None        # the readings the cells last looked at
         self.moved = 0          # cm driven since then
         self.ahead = None
 
@@ -185,10 +189,9 @@ class Bumper:
         distances = tuple(distances)
         if distances != self.last:                      # new readings
             self.last = distances
-            seen = [zone.see(d, self.moved) for zone, d in zip(self.zones, distances[1:4])]
+            seen = [zone.see(distances[i], self.moved) for zone, i in zip(self.zones, MIDDLE)]
             self.moved = 0
-            near = sorted(d for d in seen if d is not None)
-            self.ahead = near[1] if len(near) >= 2 else None
+            self.ahead = max(seen) if None not in seen else None
         return self.ahead
 
 
@@ -207,7 +210,7 @@ def telemetry_packet(heading, distance, left, right, linear, angular,
     """What the robot is doing, for the 3D robot on the web remote (docs/telemetry.js reads it).
     10 bytes:  '!' 'T' <heading lo> <heading hi> <distance> <lights> <speed> <turn> <flags> <checksum>
       heading   int16, tenths of a degree, -1800..1799; turning left counts up
-      distance  cm to what the bumper sees in front (Bumper.look: two zones out of three,
+      distance  cm to what the bumper sees in front (Bumper.look: both middle cells,
                 without the floor), 0..254; 255 = nothing
       lights    bit 0-2 = left LED red, green, blue; bit 3-5 = right LED
       speed     int8, 0.2 cm/s steps (forward is positive)

@@ -36,7 +36,7 @@ static const int TOP_PINS[3] = {WIO_KEY_C, WIO_KEY_B, WIO_KEY_A};
 static const int TOP_ROBOT[3] = {1, 2, 3};
 static const char* TOP_LABEL[3] = {"Lights", "Turbo", "Dance"};
 // the robot's numbers, copied from src/remote_control.py (bumper) and docs/pretend.js (zone angles)
-static const int SLOW_CM = 14, BUMPER_CM = 8;
+static const int SLOW_CM = 12, BUMPER_CM = 8;
 static const float ZONE_DEG[5] = {22, 11, 0, -11, -22};   // left is positive
 
 // ---------- Bluetooth ----------

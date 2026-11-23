@@ -1,118 +1,73 @@
-// What the 3D robot shows for a reading (docs/sensing.js): the heat in front, how high it is held,
-// and the shade under a line sensor.
+// What the 3D robot shows for a reading (docs/sensing.js): the blocks in front, how high it is
+// held, and the shade under a line sensor.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newHeat, easeHeat, heatAt, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM, SLOW_CM, STOP_CM,
-  newCloud, cloudAdd, cloudAlpha, CLOUD_MS, ROW_FRONT, newPose, poseTilt, poseLift, poseReset, median, STEADY, TILT_ON } from "../docs/sensing.js";
+import { newBlocks, easeBlocks, blockLook, liftOf, lineShade, newCompass, compassNews, compassStep, wrap, PALE, YELLOW, RED, FLOOR_CM, SEE_CM, SLOW_CM, STOP_CM,
+  newPose, poseTilt, poseLift, poseReset, median, STEADY, TILT_ON } from "../docs/sensing.js";
 
-/** The heat once it has settled on these readings. */
+/** The blocks once they have settled on these readings. */
 function settled(zones) {
-  const heat = newHeat();
-  for (let i = 0; i < 400 && easeHeat(heat, zones, 1 / 60); i++);
-  return heat;
+  const blocks = newBlocks();
+  for (let i = 0; i < 400 && easeBlocks(blocks, zones, 1 / 60); i++);
+  return blocks;
 }
 const close = (a, b, eps = 0.02) => a.every((v, i) => Math.abs(v - b[i]) < eps);
 const redder = (rgb) => rgb[0] - rgb[1];       // yellow -> orange -> red: green goes down
+const clear = { cm: null, blocked: false };    // the bumper has nothing to say
 
-test("yellow from where the bumper slows, warmer on the way in, red where it stops", () => {
-  const at = (cm) => heatAt(settled([cm, cm, cm, cm, cm]), 2);
-  assert.equal(SLOW_CM, 14); assert.equal(STOP_CM, 8);
-  assert.ok(close(at(20).rgb, PALE), "further than 16 cm: pale");
-  assert.ok(close(at(14).rgb, YELLOW), "14 cm: yellow");
-  assert.ok(redder(at(11).rgb) > redder(at(14).rgb), "closer is warmer");
-  assert.ok(redder(at(9).rgb) > redder(at(11).rgb));
-  assert.ok(close(at(8).rgb, RED), "8 cm: red");
-  assert.ok(close(at(5).rgb, RED));
-  assert.ok(at(39).alpha < at(30).alpha, "fades in from 40 cm");
-  assert.equal(at(30).alpha, at(15).alpha, "and is full from 30 cm");
+test("a block stands where its reading says, pale, and firmer the closer it comes", () => {
+  const blocks = settled([35, 25, 17, 9, null]);
+  assert.deepEqual([0, 1, 2, 3].map((i) => blockLook(blocks, i, clear).cm), [35, 25, 17, 9]);
+  for (const i of [0, 1, 2, 3]) assert.ok(close(blockLook(blocks, i, clear).rgb, PALE) && !blockLook(blocks, i, clear).lit, `block ${i} is pale`);
+  assert.equal(blockLook(blocks, 4, clear).alpha, 0, "nothing seen: no block");
+  const at = (cm) => blockLook(settled([cm, cm, cm, cm, cm]), 2, clear).alpha;
+  assert.ok(at(39) < at(30) && at(30) < at(20) && at(20) < at(10), "fades in from 40 cm and firms up on the way in");
+  assert.equal(blockLook(settled([SEE_CM + 1, 50, 200, 60, 41]), 2, clear).alpha, 0, "further than 40 cm is not drawn");
 });
 
-test("only the middle three zones go red, like the bumper", () => {
-  const heat = settled([5, 5, 5, 5, 5]);
-  for (const u of [1, 2, 3]) assert.ok(close(heatAt(heat, u).rgb, RED), `zone ${u}`);
-  for (const u of [0, 4]) assert.ok(!close(heatAt(heat, u).rgb, RED, 0.1), `zone ${u} stays orange`);
-  assert.ok(heatAt(heat, 0).alpha < heatAt(heat, 1).alpha, "the outer zones are fainter");
+test("the floor's own reading is only a pale block: colour is the bumper's word, not the reading's", () => {
+  assert.equal(SLOW_CM, 12); assert.equal(STOP_CM, 8);
+  const blocks = settled([17, 16.5, 13.5, 9, 17]);     // readings closer than SLOW_CM, but the bumper says all clear
+  for (let i = 0; i < 5; i++) assert.ok(close(blockLook(blocks, i, clear).rgb, PALE), `block ${i}`);
+  for (let i = 0; i < 5; i++) assert.ok(close(blockLook(blocks, i).rgb, PALE), `block ${i}, bumper left out`);
 });
 
-test("stopped by the bumper: the middle is red however far the wall is", () => {
-  const heat = settled([25, 25, 25, 25, 25]);
-  assert.ok(!close(heatAt(heat, 2).rgb, RED, 0.1));
-  assert.ok(close(heatAt(heat, 2, true).rgb, RED));
-  assert.ok(!close(heatAt(heat, 0, true).rgb, RED, 0.1), "not the outer zones");
-});
-
-test("distance and colour blend between neighbouring zones: no steps", () => {
-  const heat = settled([null, 30, 10, 30, null]);
-  assert.equal(heatAt(heat, 1).cm, 30);
-  assert.equal(heatAt(heat, 2).cm, 10);
-  assert.equal(heatAt(heat, 1.5).cm, 20);
-  let last = heatAt(heat, 1);
-  for (let u = 1.05; u <= 2.001; u += 0.05) {
-    const h = heatAt(heat, u);
-    assert.ok(h.cm <= last.cm && last.cm - h.cm < 2.5, `one smooth slope at ${u.toFixed(2)}: ${last.cm} -> ${h.cm}`);
-    assert.ok(Math.abs(h.rgb[1] - last.rgb[1]) < 0.2, `colour at ${u.toFixed(2)}`);
-    last = h;
-  }
-});
-
-test("a zone that sees nothing fades away towards its neighbour, and both ends are soft", () => {
-  const heat = settled([null, 20, 20, null, null]);
-  assert.ok(heatAt(heat, 1).alpha > 0.5);
-  assert.equal(heatAt(heat, 0).alpha, 0);
-  assert.equal(heatAt(heat, 3).alpha, 0);
-  const half = heatAt(heat, 0.5);
-  assert.ok(half.alpha > 0 && half.alpha < heatAt(heat, 1).alpha);
-  assert.equal(half.cm, 20, "it fades, it does not slide off to somewhere else");
-  const all = settled([20, 20, 20, 20, 20]);
-  assert.equal(heatAt(all, -0.5).alpha, 0);
-  assert.equal(heatAt(all, 4.5).alpha, 0);
-  assert.ok(heatAt(all, -0.25).alpha > 0 && heatAt(all, -0.25).alpha < heatAt(all, 0).alpha);
+test("while the bumper acts, the three blocks in front of it take its colour: yellow, warmer, red", () => {
+  const blocks = settled([20, 11, 10.5, 10, 20]);
+  const at = (cm, blocked = false) => blockLook(blocks, 2, { cm, blocked });
+  assert.ok(close(at(SLOW_CM).rgb, YELLOW), "at SLOW_CM: yellow");
+  assert.ok(redder(at(10).rgb) > redder(at(SLOW_CM).rgb), "closer is warmer");
+  assert.ok(redder(at(8.5).rgb) > redder(at(10).rgb));
+  assert.ok(close(at(7.9).rgb, RED), "inside STOP_CM: red");
+  assert.ok(close(at(11, true).rgb, RED), "stopped by the bumper: red, whatever the distance");
+  assert.ok(at(10).lit && at(10).alpha > blockLook(blocks, 2, clear).alpha, "and they stand out");
+  for (const i of [1, 2, 3]) assert.ok(blockLook(blocks, i, { cm: 10, blocked: false }).lit, `block ${i}`);
+  for (const i of [0, 4]) assert.ok(close(blockLook(blocks, i, { cm: 5, blocked: true }).rgb, PALE), `the outer block ${i} stays pale`);
+  assert.equal(at(10).cm, 10.5, "the block still stands at its own reading");
 });
 
 test("readings are followed over time, not jumped to", () => {
-  const heat = settled([null, 30, 30, 30, null]);
+  const blocks = settled([null, 30, 30, 30, null]);
   const zones = [null, 30, 14, 30, null];
-  assert.equal(easeHeat(heat, zones, 1 / 60), true);
-  assert.ok(heat.cm[2] < 30 && heat.cm[2] > 26, `one frame later: ${heat.cm[2]}`);
-  for (let i = 0; i < 12; i++) easeHeat(heat, zones, 1 / 60);            // a fifth of a second
-  assert.ok(heat.cm[2] < 18, `mostly there: ${heat.cm[2]}`);
-  for (let i = 0; i < 120 && easeHeat(heat, zones, 1 / 60); i++);
-  assert.equal(heat.cm[2], 14);
-  assert.equal(easeHeat(heat, zones, 1 / 60), false, "settled: nothing left to draw");
+  assert.equal(easeBlocks(blocks, zones, 1 / 60), true);
+  assert.ok(blocks.cm[2] < 30 && blocks.cm[2] > 26, `one frame later: ${blocks.cm[2]}`);
+  for (let i = 0; i < 12; i++) easeBlocks(blocks, zones, 1 / 60);        // a fifth of a second
+  assert.ok(blocks.cm[2] < 18, `mostly there: ${blocks.cm[2]}`);
+  for (let i = 0; i < 120 && easeBlocks(blocks, zones, 1 / 60); i++);
+  assert.equal(blocks.cm[2], 14);
+  assert.equal(easeBlocks(blocks, zones, 1 / 60), false, "settled: nothing left to draw");
 });
 
-test("a wall that shows up fades in where it is, and one that goes fades out", () => {
-  const heat = settled([null, null, 35, null, null]);
+test("a block that shows up fades in where it is, and one that goes fades out", () => {
+  const blocks = settled([null, null, 35, null, null]);
   const zones = [null, null, 35, 15, null];
-  easeHeat(heat, zones, 1 / 60);
-  assert.equal(heat.cm[3], 15, "no slide in from far away");
-  assert.ok(heat.seen[3] > 0 && heat.seen[3] < 0.3);
-  easeHeat(heat, [null, null, null, 15, null], 1 / 60);
-  assert.ok(heat.seen[2] < 1 && heat.seen[2] > 0.7);
-  assert.equal(heat.cm[2], 35);
-  const gone = settled([null, null, null, null, null]);
-  assert.deepEqual(gone.seen, [0, 0, 0, 0, 0]);
-  assert.equal(heatAt(settled([SEE_CM + 1, 50, 200, 60, 41]), 2).alpha, 0, "further than 40 cm is not drawn");
-});
-
-test("point cloud: readings become points that fade, and only the newest are kept", () => {
-  const cloud = newCloud(6);
-  cloudAdd(cloud, 1, ROW_FRONT, 17, 1000);
-  cloudAdd(cloud, 2, ROW_FRONT, null, 1000);            // nothing seen: no point
-  cloudAdd(cloud, 3, ROW_FRONT, SEE_CM + 60, 1000);     // too far for the picture: no point
-  assert.equal(cloud.points.length, 1);
-  const [p] = cloud.points;
-  assert.equal(cloudAlpha(p, 1000), 1);
-  assert.ok(cloudAlpha(p, 1000 + CLOUD_MS / 2) > 0.4 && cloudAlpha(p, 1000 + CLOUD_MS / 2) < 0.6, "half gone half way");
-  assert.equal(cloudAlpha(p, 1000 + CLOUD_MS), 0);
-  assert.equal(cloudAlpha(p, 900), 0, "a clock that jumped back shows nothing odd");
-  for (let i = 0; i < 8; i++) cloudAdd(cloud, i % 5, ROW_FRONT, 20 + i, 2000 + i);
-  assert.equal(cloud.points.length, 6);
-  assert.deepEqual(cloud.points.map((q) => q.cm).sort(), [22, 23, 24, 25, 26, 27], "the oldest made way");
-  const far = newCloud();
-  cloudAdd(far, 2, ROW_FRONT, 39, 0);
-  cloudAdd(far, 2, ROW_FRONT, 25, 0);
-  assert.ok(cloudAlpha(far.points[0], 0) < cloudAlpha(far.points[1], 0), "far points are fainter, like the heat");
+  easeBlocks(blocks, zones, 1 / 60);
+  assert.equal(blocks.cm[3], 15, "no slide in from far away");
+  assert.ok(blocks.seen[3] > 0 && blocks.seen[3] < 0.3);
+  easeBlocks(blocks, [null, null, null, 15, null], 1 / 60);
+  assert.ok(blocks.seen[2] < 1 && blocks.seen[2] > 0.7);
+  assert.equal(blocks.cm[2], 35);
+  assert.deepEqual(settled([null, null, null, null, null]).seen, [0, 0, 0, 0, 0]);
 });
 
 test("picked up: the further the floor, the higher the robot is drawn", () => {
