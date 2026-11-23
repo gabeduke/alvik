@@ -6,10 +6,13 @@
 // Controls (screen side up, buttons along the top edge):
 //   5-way up / down     forward / back (held)
 //   5-way left / right  spin left / right; with up or down held in tilt mode, it curves instead
-//   5-way press         tilt steering on / off (hold it 1 s: bumper on / off)
 //   top buttons         left = lights, middle = turbo, right = dance
+//   5-way press         nothing by itself (a child's thumb clicks it all the time while driving)
+// Grown-up switches: press the stick in and keep it in, then hold a top button for 1.5 s:
+//   left = bumper on / off, right = tilt steering on / off. The screen shows which and how long.
+//   The logic is in wio_buttons.h, tested on a computer (tests/test_robot.py WioButtons).
 //
-// Not yet run on a real Wio Terminal: see README.md next to this file for setup and what to check.
+// It has driven a real Alvik. See README.md next to this file for setup and what is still unchecked.
 
 // Bluetooth first: TFT_eSPI defines min/max macros that break the C++ headers rpcBLE pulls in.
 #include "rpcBLEDevice.h"
@@ -18,6 +21,7 @@
 #include <TFT_eSPI.h>
 #include "LIS3DHTR.h"
 #include "alvik_packets.h"
+#include "wio_buttons.h"
 
 // ---------- tweakables ----------
 static const char* ROBOT_NAME = "Alvik";
@@ -28,16 +32,20 @@ static const float TILT_DEAD_DEG = 6;        // less than this = straight
 #define TILT_AXIS getAccelerationY           // which way the Wio tilts for steering: check on the screen,
 static const float TILT_SIGN = 1;            //   the tilt bar should lean the way you tip it (else -1 / other axis)
 static const uint32_t RESEND_MS = 150;       // repeat the stick this often while it is held (robot stops after 600 ms quiet)
-static const uint32_t LONG_PRESS_MS = 1000;
+static const uint32_t HOLD_MS = 1500;       // grown-up switches: stick pressed in + a top button held this long
 static const uint32_t DRAW_MS = 80;
 // top buttons, left to right as you hold it, and the robot button each one presses (1 lights, 2 turbo, 3 dance)
 // (if they come out in the wrong order on your Wio, swap the pins here)
 static const int TOP_PINS[3] = {WIO_KEY_C, WIO_KEY_B, WIO_KEY_A};
 static const int TOP_ROBOT[3] = {1, 2, 3};
 static const char* TOP_LABEL[3] = {"Lights", "Turbo", "Dance"};
-// the robot's numbers, copied from src/remote_control.py (bumper) and docs/pretend.js (zone angles)
+// the grown-up switch behind each top button (stick pressed in, button held), and its name on the screen
+enum { NO_SWITCH, BUMPER_SWITCH, TILT_SWITCH };
+static const int TOP_SWITCH[3] = {BUMPER_SWITCH, NO_SWITCH, TILT_SWITCH};
+static const char* TOP_SWITCH_LABEL[3] = {"Bumper", "", "Tilt"};
+// the robot's numbers, copied from src/remote_control.py (bumper) and docs/pretend.js (ZONE_DEG)
 static const int SLOW_CM = 12, BUMPER_CM = 8;
-static const float ZONE_DEG[5] = {22, 11, 0, -11, -22};   // left is positive
+static const float ZONE_DEG[5] = {22.5, 7.5, 0, -7.5, -22.5};   // left is positive
 
 // ---------- Bluetooth ----------
 static BLEUUID NUS("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
@@ -77,9 +85,8 @@ static int sentX = 0, sentY = 0;
 static uint32_t sentAt = 0;
 static bool tilt = false;
 static float tiltDeg = 0;
-static bool pressDown = false, longDone = false;
-static uint32_t pressAt = 0;
-static bool topDown[3] = {false, false, false};
+static alvik::TopButtons tops(HOLD_MS);
+static bool shift = false;                   // the stick is pressed in (and not pushed any way): grown-up switches
 static uint32_t drawnAt = 0;
 static bool dirty = true;
 static int zoneHist[5][3];                   // the last three raw readings per zone, newest first
@@ -195,28 +202,27 @@ static void readInput() {
   uint32_t now = millis();
   uint8_t p[5];
 
-  // centre press: short = tilt steering, long = bumper
-  if (press && !pressDown) { pressDown = true; pressAt = now; longDone = false; }
-  if (press && pressDown && !longDone && now - pressAt >= LONG_PRESS_MS) {
-    longDone = true;
-    alvik::buttonPacket(p, 4, true); send(p, 5);
-    alvik::buttonPacket(p, 4, false); send(p, 5);
-  }
-  if (!press && pressDown) {
-    pressDown = false;
-    if (!longDone) tilt = !tilt;
-    dirty = true;
-  }
-
-  // top buttons: press and let go, like the app's buttons
+  // Pressing the stick in does nothing by itself. Pressed in and not pushed any way, it turns the
+  // top buttons into the grown-up switches while they are held (wio_buttons.h).
+  bool wasShift = shift;
+  shift = press && !up && !down && !left && !right;
+  bool raw[3];
+  alvik::TopButtons::What did[3];
+  for (int i = 0; i < 3; i++) raw[i] = !digitalRead(TOP_PINS[i]);
+  tops.step(shift, raw, now, did);
   for (int i = 0; i < 3; i++) {
-    bool on = !digitalRead(TOP_PINS[i]);
-    if (on != topDown[i]) {
-      topDown[i] = on;
-      alvik::buttonPacket(p, TOP_ROBOT[i], on); send(p, 5);
-      dirty = true;
+    if (did[i] == alvik::TopButtons::DOWN || did[i] == alvik::TopButtons::TAP) { alvik::buttonPacket(p, TOP_ROBOT[i], true); send(p, 5); }
+    if (did[i] == alvik::TopButtons::UP || did[i] == alvik::TopButtons::TAP) { alvik::buttonPacket(p, TOP_ROBOT[i], false); send(p, 5); }
+    if (did[i] == alvik::TopButtons::HELD) {
+      if (TOP_SWITCH[i] == TILT_SWITCH) tilt = !tilt;
+      if (TOP_SWITCH[i] == BUMPER_SWITCH) {           // the robot's button 4; it says how it stands in its next packet
+        alvik::buttonPacket(p, 4, true); send(p, 5);
+        alvik::buttonPacket(p, 4, false); send(p, 5);
+      }
     }
+    if (did[i]) dirty = true;
   }
+  if (shift != wasShift || tops.waiting()) dirty = true;    // the header changes, and the hold bar grows
 
   // tilt, for steering and the tilt bar
   float g = TILT_SIGN * lis.TILT_AXIS();
@@ -331,6 +337,12 @@ static void drawRadar() {
     radar.setTextColor(TFT_RED);
     radar.drawString("STOP!", cx, 4, 4);
   }
+  if (!t.bumper) {                           // easy to forget it is off: say so in big letters
+    radar.fillRect(0, 0, RW, 20, TFT_RED);
+    radar.setTextDatum(TC_DATUM);
+    radar.setTextColor(TFT_WHITE);
+    radar.drawString("BUMPER OFF", cx, 2, 2);
+  }
   radar.pushSprite(0, 26);
 }
 
@@ -374,15 +386,21 @@ static void drawPanel() {
   panel.pushSprite(RW, 26);
 }
 
+// The top strip names the three buttons above it. With the stick pressed in it turns purple and names
+// the grown-up switches instead, with a bar that fills while one is held.
 static void drawHeader() {
-  tft.fillRect(0, 0, 320, 24, 0x18E3);
+  const uint16_t bg = shift ? 0x4010 : 0x18E3;         // purple : dark grey
+  uint32_t now = millis();
+  tft.fillRect(0, 0, 320, 24, bg);
   tft.setTextDatum(MC_DATUM);
   for (int i = 0; i < 3; i++) {
-    tft.setTextColor(topDown[i] ? TFT_YELLOW : TFT_WHITE, 0x18E3);
-    tft.drawString(TOP_LABEL[i], 34 + i * 70, 12, 2);
+    tft.setTextColor(tops.isDown(i) ? TFT_YELLOW : TFT_WHITE, bg);
+    tft.drawString(shift ? TOP_SWITCH_LABEL[i] : TOP_LABEL[i], 34 + i * 70, 10, 2);
+    float held = tops.progress(i, now);
+    if (held >= 0) tft.fillRect(4 + i * 70, 20, (int)(60 * held), 4, TFT_YELLOW);
   }
-  tft.setTextColor(TFT_GREEN, 0x18E3);
-  tft.drawString("Alvik", 286, 12, 2);
+  tft.setTextColor(shift ? TFT_WHITE : TFT_GREEN, bg);
+  tft.drawString(shift ? "hold" : "Alvik", 286, 10, 2);
 }
 
 // ---------- main ----------
@@ -391,6 +409,7 @@ void setup() {
   for (int pin : {WIO_5S_UP, WIO_5S_DOWN, WIO_5S_LEFT, WIO_5S_RIGHT, WIO_5S_PRESS, WIO_KEY_A, WIO_KEY_B, WIO_KEY_C})
     pinMode(pin, INPUT_PULLUP);
   for (auto& z : zoneHist) for (int& v : z) v = alvik::NONE;
+  for (int i = 0; i < 3; i++) tops.grownUp[i] = TOP_SWITCH[i] != NO_SWITCH;
   tft.begin();
   tft.setRotation(3);                        // landscape, buttons along the top
   radar.setColorDepth(8);

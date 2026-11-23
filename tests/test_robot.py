@@ -1070,5 +1070,81 @@ class WioPackets(RobotTest):
                               (1, True), (1, False), (2, True), (2, False), (3, True), (3, False), (4, True), (4, False),
                               ("T", True)])
 
+class WioButtons(unittest.TestCase):
+    """The Wio remote's top buttons (remotes/wio_remote/wio_buttons.h). A child drives with a thumb on
+    the stick and clicks it in all the time, so the click does nothing by itself: the bumper and tilt
+    switches need the stick pressed in AND the left or right top button held for 1.5 s.
+    Needs a C++ compiler (g++ or c++); skipped without one."""
+
+    @classmethod
+    def setUpClass(cls):
+        cxx = shutil.which("g++") or shutil.which("c++")
+        if not cxx:
+            raise unittest.SkipTest("no C++ compiler")
+        import subprocess
+        cls.tmp = tempfile.mkdtemp()
+        cls.exe = os.path.join(cls.tmp, "buttons")
+        subprocess.run([cxx, "-std=c++11", "-o", cls.exe,
+                        os.path.join(REPO, "tests", "wio_buttons_harness.cpp")], check=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(getattr(cls, "tmp", ""), ignore_errors=True)
+
+    def press(self, *spans, until=4000, step=5):
+        """What the buttons did. Each span is (what, from ms, to ms): what = "stick" (pressed in),
+        0, 1 or 2 (a top button, left to right). Read every `step` ms, like the remote's loop.
+        -> [(ms, button, "DOWN" | "UP" | "TAP" | "HELD")]"""
+        import subprocess
+        lines = []
+        for ms in range(1000, 1000 + until + 1, step):
+            on = lambda what: int(any(w == what and a <= ms - 1000 < b for w, a, b in spans))
+            lines.append("%d %d %d %d %d" % (ms, on("stick"), on(0), on(1), on(2)))
+        run = subprocess.run([self.exe], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
+        out = [l.split() for l in run.stdout.split("\n") if l]
+        self.waits = [(int(l[0]) - 1000, int(l[1]), int(l[3])) for l in out if l[2] == "WAIT"]
+        return [(int(l[0]) - 1000, int(l[1]), l[2]) for l in out if l[2] != "WAIT"]
+
+    def test_the_stick_pressed_in_does_nothing_by_itself(self):
+        self.assertEqual(self.press(("stick", 0, 4000)), [])
+        self.assertEqual(self.press(("stick", 0, 300), ("stick", 500, 2600), ("stick", 2700, 2750)), [])
+
+    def test_a_button_alone_is_an_ordinary_press(self):
+        for b in (0, 1, 2):
+            self.assertEqual(self.press((b, 100, 250)), [(100, b, "DOWN"), (250, b, "UP")])
+        self.assertEqual(self.press((0, 100, 3900)), [(100, 0, "DOWN"), (3900, 0, "UP")], "held for ever: still no switch")
+
+    def test_stick_in_then_a_held_button_is_the_switch_once(self):
+        for b in (0, 2):
+            self.assertEqual(self.press(("stick", 0, 4000), (b, 500, 3500)), [(2000, b, "HELD")],
+                             "after 1.5 s, once, and nothing goes to the robot for that button")
+            self.assertEqual(self.waits[0], (500, b, 0))
+            self.assertEqual(self.waits[-1][:2], (1995, b))
+            self.assertGreater(self.waits[-1][2], 98, "the screen can show how far the hold is")
+        self.assertEqual(self.press(("stick", 0, 4000), (0, 500, 2100), (0, 2200, 3800)),
+                         [(2000, 0, "HELD"), (3700, 0, "HELD")], "let go and hold again: the switch again")
+
+    def test_stick_in_and_a_quick_press_is_still_the_buttons_own_job(self):
+        # his thumb has the stick clicked in while he taps Lights or Dance: it must still work
+        for b in (0, 2):
+            self.assertEqual(self.press(("stick", 0, 4000), (b, 500, 700)), [(700, b, "TAP")])
+            self.assertEqual(self.press(("stick", 0, 4000), (b, 500, 1990)), [(1990, b, "TAP")], "just short of the hold")
+
+    def test_the_middle_button_has_no_switch(self):
+        self.assertEqual(self.press(("stick", 0, 4000), (1, 500, 3500)), [(500, 1, "DOWN"), (3500, 1, "UP")])
+
+    def test_the_stick_has_to_go_in_first_and_stay_in(self):
+        self.assertEqual(self.press((0, 100, 3900), ("stick", 300, 4000)), [(100, 0, "DOWN"), (3900, 0, "UP")],
+                         "button first, stick after: an ordinary press, however long")
+        self.assertEqual(self.press(("stick", 0, 1200), (2, 500, 3500)), [(1200, 2, "DOWN"), (3500, 2, "UP")],
+                         "the stick came out (or he pushed it to drive) before the hold was done")
+
+    def test_chattering_contacts_are_one_press(self):
+        chatter = [(0, 500, 505), (0, 510, 3000)]
+        self.assertEqual(self.press(("stick", 0, 4000), *chatter), [(2000, 0, "HELD")])
+        self.assertEqual(self.press((0, 500, 505), (0, 510, 600)), [(500, 0, "DOWN"), (600, 0, "UP")])
+        self.assertEqual(self.press((2, 500, 700), (2, 705, 710)), [(500, 2, "DOWN"), (700, 2, "UP")], "and one let-go")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

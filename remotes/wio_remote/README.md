@@ -7,7 +7,8 @@ remote (`alvik_packets.h`), so the robot needs no new code.
 
 **It has driven a real Alvik** (Wio wireless firmware 2.1.3, Seeeduino:samd 1.8.5, rpcBLE 1.0.0).
 The packets are tested too (`python3 tests/test_robot.py WioPackets` checks them against the robot's
-own parser and `tests/telemetry_vectors.json`). Not checked yet: the rest of "First run" below.
+own parser and `tests/telemetry_vectors.json`), and so are the buttons (`WioButtons`).
+Not checked yet: the rest of "First run" below.
 
 ## Controls
 
@@ -15,9 +16,24 @@ own parser and `tests/telemetry_vectors.json`). Not checked yet: the rest of "Fi
 |---|---|
 | 5-way up / down | forward / back, while held |
 | 5-way left / right | spin left / right |
-| 5-way press | tilt steering on or off: hold up and tip the Wio like a steering wheel to curve |
-| 5-way press, held 1 s | bumper on / off |
 | top buttons, left to right | lights · turbo · dance |
+| 5-way press | nothing by itself |
+
+**Grown-up switches.** A child's thumb clicks the stick in all the time while driving, so the click
+does nothing by itself. To change the bumper or tilt steering:
+
+1. Press the stick in and keep it in, without pushing it any way. The top strip turns purple and
+   says "Bumper" on the left and "Tilt" on the right.
+2. Hold the top button above the one you want for 1.5 seconds. A yellow bar fills while you hold.
+
+| | |
+|---|---|
+| stick in + left top button, held | bumper on / off (the robot's lights flash green for on, red for off) |
+| stick in + right top button, held | tilt steering on / off: hold up and tip the Wio like a steering wheel to curve |
+
+Let go early and the button does its ordinary job (lights or dance), so a quick press still works
+with the stick clicked in. While the bumper is off, the radar says BUMPER OFF in red. The robot turns
+the bumper back on each time a remote connects.
 
 The screen: battery, speed, what is ahead, a compass, turbo and bumper (as the robot reports them),
 and a radar seen from above. The radar shows the robot with its light colours, the floor's colour under
@@ -59,6 +75,9 @@ If the robot goes away, the Wio looks for it again. If Bluetooth gets stuck, it 
 - **It connects.** While it looks, numbered steps show at the bottom of the screen (and on USB serial
   at 115200). The last one says where it got stuck. A good start ends "subscribed".
 - **The top buttons are in the right order.** If they aren't, swap the pins in `TOP_PINS`.
+- **The grown-up switches** (above). On a computer the logic is tested; on the real Wio, only that the
+  sketch starts and connects has been checked so far. To check: click the stick in while driving
+  (nothing should change), then do both switches. `HOLD_MS` sets how long the hold is.
 - **The tilt bar leans the way you tip the Wio.** If not, flip `TILT_SIGN` or change `TILT_AXIS` to
   `getAccelerationX`.
 - **Letting go stops the robot.** The Wio sends "stop" when you let go, and the robot also stops
@@ -86,6 +105,8 @@ for the bootloader, then upload.
 ## Files
 
 - `wio_remote.ino`: the sketch (Bluetooth, buttons, screen).
+- `wio_buttons.h`: the top buttons and the grown-up switches, as plain C++ so the tests can press
+  them on a computer.
 - `alvik_packets.h`: the packets, as plain C++ so the tests can build it on a computer. The layouts
   are the robot's (`src/remote_control.py`) and the web page's (`docs/telemetry.js`): change them all
   together.
